@@ -387,6 +387,9 @@ class EmulatorEngine(
     /** The running DS game's party screen is mapped ([NdsBattleTaps.Layout.partySlots]). */
     val dsSwitchMapped: Boolean get() = ndsTaps.layout.partySlots != null
 
+    /** The running DS game's bag and party screens have a return arrow BACK can tap ([NdsBattleTaps.Layout.screenBack]). */
+    val dsScreenBackMapped: Boolean get() = ndsTaps.layout.screenBack != null
+
     init { battle.stateObserved = ndsTaps::onState }
 
     fun setFastForwardHeld(on: Boolean) {

@@ -395,7 +395,9 @@ change to any of the places listed under "Where it's decided" updates its rows h
     battle state `readGen4BattleInput` reads (BattleContext's command + battler 0's selection step, BattleSystem.battleInput's
     drawn panel; docs/DEVELOPMENT.md's "DS LAYOUT"). Checked headless on the player's save in a scripted wild battle: each
     tap at those places, a move tapped from 7 frames after FIGHT on. BAG and POKéMON open the game's own screens (the
-    touch screen floats in on one screen); there's no switch of our own.
+    touch screen floats in on one screen); there's no switch of our own. On two screens the bag, and the party where the
+    companion has no switch, take the companion's place while open, and the companion's BACK taps their return arrow
+    (`NdsBattleTaps.HEARTGOLD`, headless on HeartGold and Origin HeartGold).
 25. German HeartGold / SoulSilver rev 0 (`IPKD` / `IPGD`): the USA carts' code and layouts with their globals moved, the
     battle read through the German `sFieldSysPtr` / `gOverlayTemplate_Battle` (`GEN4_HEARTGOLD_DE`), so the buttons should
     work as note 24's, but no German battle has been checked yet. Their touch-screen moments are followed since 2026-11-07
@@ -476,7 +478,7 @@ change to any of the places listed under "Where it's decided" updates its rows h
     PC anywhere and FLY ran headless through its own script engine and flight task (landed in Pallet Town); WILD ENCOUNTERS'
     cart rates come from its map headers and encounter archive (`NdsArt.readOrigin`). Its battle engine is its own (a
     manager at 0x02255BAC, no BattleSystem): the BATTLE tab reads its battle objects (`Gen4ManagedBattle`). Its commands and
-    moves sit where HeartGold's do, so BATTLE BUTTONS press them with HeartGold's taps (`NdsBattleTaps.GEN4`): its battle
+    moves sit where HeartGold's do, so BATTLE BUTTONS press them with HeartGold's taps (`NdsBattleTaps.HEARTGOLD`): its battle
     UI's input handler is set while it waits (+0x238 -> +0x10) and another UI object (+0x234) runs the waiting panel's
     handler at +0x57C (0x02202445 the commands, 0x02202F4D the moves, 0x02202955 the bag, 0x0220270D the party;
     `readManagedBattleInput`, `battleTouch`), checked headless in a wild and a trainer battle. Not the panel's id at

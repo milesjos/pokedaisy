@@ -1,6 +1,7 @@
 package com.pokedaisy.app
 
 import com.pokedaisy.app.companion.data.BATTLE_INPUT_ACTION_SELECT
+import com.pokedaisy.app.companion.data.BATTLE_INPUT_BAG_OPEN
 import com.pokedaisy.app.companion.data.BATTLE_INPUT_MOVE_SELECT
 import com.pokedaisy.app.companion.data.BATTLE_INPUT_PARTY_OPEN
 import java.util.ArrayDeque
@@ -23,6 +24,8 @@ class NdsBattleTaps(private val touch: (down: Boolean, x: Int, y: Int) -> Unit =
         /** The party screen's six panels (left to right, then down) and the SHIFT a panel opens; null = no switch here. */
         val partySlots: List<Pair<Int, Int>>? = null,
         val shift: Pair<Int, Int>? = null,
+        /** The bag's and the party screen's return arrow; null = BACK can't close them. */
+        val screenBack: Pair<Int, Int>? = null,
     )
 
     /** The running game's panels ([layoutFor]); set before its battles. */
@@ -43,13 +46,18 @@ class NdsBattleTaps(private val touch: (down: Boolean, x: Int, y: Int) -> Unit =
     private var frames = 0
     private var phase = 0
     @Volatile private var state = 0
+    /** Frames the battle has reported [state] ([tick]'s count). */
+    @Volatile private var stateFrames = 0
     private val lock = Any()
 
     /** A pick is still being pressed: the buttons wait. */
     val busy: Boolean get() = synchronized(lock) { steps.isNotEmpty() }
 
     /** The fast poll's battle state (emu thread). */
-    fun onState(state: Int) { this.state = state }
+    fun onState(state: Int) {
+        if (state != this.state) stateFrames = 0
+        this.state = state
+    }
 
     /** 0 FIGHT (the move panel opens), 1 BAG, 2 POKéMON, 3 RUN. */
     fun selectAction(index: Int) = layout.actions.getOrNull(index)?.let { queue(listOf(Step.Tap(it.first, it.second))) }
@@ -83,9 +91,19 @@ class NdsBattleTaps(private val touch: (down: Boolean, x: Int, y: Int) -> Unit =
         queue(open + Step.WaitFor(BATTLE_INPUT_PARTY_OPEN, settle = PARTY_SETTLE) + pick + again, party = true)
     }
 
-    /** The move panel's CANCEL (back to FIGHT / BAG / RUN / POKéMON). */
+    /** The move panel's CANCEL, or the bag's / party screen's return arrow: back to FIGHT / BAG / RUN / POKéMON. The arrow
+     * drops touches while its screen fades in, like the party's panels ([PARTY_SETTLE]), and sits where the command panel
+     * has POKéMON, so it's tapped only while the screen BACK saw is still up. */
     fun back() {
-        if (state == BATTLE_INPUT_MOVE_SELECT) layout.cancel.let { queue(listOf(Step.Tap(it.first, it.second))) }
+        val l = layout
+        when (val seen = state) {
+            BATTLE_INPUT_MOVE_SELECT -> l.cancel.let { queue(listOf(Step.Tap(it.first, it.second))) }
+            BATTLE_INPUT_BAG_OPEN, BATTLE_INPUT_PARTY_OPEN -> l.screenBack?.let {
+                val tap = Step.IfStill(seen, listOf(Step.Tap(it.first, it.second)))
+                val wait = PARTY_SETTLE - stateFrames
+                queue(if (wait > 0) listOf(Step.Wait(wait), tap) else listOf(tap), screen = seen)
+            }
+        }
     }
 
     fun cancel() = synchronized(lock) {
@@ -95,11 +113,14 @@ class NdsBattleTaps(private val touch: (down: Boolean, x: Int, y: Int) -> Unit =
         phase = 0
     }
 
-    private fun queue(list: List<Step>, party: Boolean = false) = synchronized(lock) {
+    private fun queue(list: List<Step>, party: Boolean = false, screen: Int? = null) = synchronized(lock) {
         // One pick at a time: a second tap while one plays is dropped, as the GBA's controller does.
         if (steps.isNotEmpty()) return
         // A pick is made from the menu the battle shows: none up, nothing to press (a switch also from the party screen).
-        if (state != BATTLE_INPUT_ACTION_SELECT && state != BATTLE_INPUT_MOVE_SELECT && !(party && state == BATTLE_INPUT_PARTY_OPEN)) return
+        // BACK from the bag or the party only on that screen: its arrow is POKéMON's place on the command panel.
+        val ok = if (screen != null) state == screen
+            else state == BATTLE_INPUT_ACTION_SELECT || state == BATTLE_INPUT_MOVE_SELECT || (party && state == BATTLE_INPUT_PARTY_OPEN)
+        if (!ok) return
         steps.addAll(list)
         frames = 0
         phase = 0
@@ -107,6 +128,7 @@ class NdsBattleTaps(private val touch: (down: Boolean, x: Int, y: Int) -> Unit =
 
     /** Emu thread, before each frame. */
     fun tick() = synchronized(lock) {
+        if (stateFrames < Int.MAX_VALUE) stateFrames++
         val step = steps.peekFirst() ?: return
         when (step) {
             is Step.Tap -> {
@@ -148,6 +170,9 @@ class NdsBattleTaps(private val touch: (down: Boolean, x: Int, y: Int) -> Unit =
             partySlots = listOf(64 to 23, 192 to 23, 64 to 71, 192 to 71, 64 to 119, 192 to 119),
             shift = 128 to 80,
         )
+        /** HeartGold / SoulSilver's: [GEN4] and the bag's and party screen's return arrow, bottom right (headless on
+         * HeartGold and Origin HeartGold; Heartfelt Gold runs HeartGold's battle screens; Platinum's isn't checked). */
+        val HEARTGOLD = Layout(GEN4.actions, GEN4.moves, GEN4.cancel, GEN4.partySlots, GEN4.shift, screenBack = 236 to 172)
         /** Black / White's and their sequels' (headless in White and Black 2: FIGHT the big plate up top, BAG / RUN /
          * POKéMON along the bottom, the cards 2 x 2 from y 35, the return arrow bottom right). */
         val GEN5 = Layout(
@@ -157,7 +182,11 @@ class NdsBattleTaps(private val touch: (down: Boolean, x: Int, y: Int) -> Unit =
         )
 
         /** The panels of the DS game with this header code. */
-        fun layoutFor(gameCode: String) = if (gameCode.startsWith("IR")) GEN5 else GEN4
+        fun layoutFor(gameCode: String) = when {
+            gameCode.startsWith("IR") -> GEN5
+            gameCode.startsWith("IPK") || gameCode.startsWith("IPG") -> HEARTGOLD
+            else -> GEN4
+        }
 
         private const val TAP_FRAMES = 3
         private const val GAP_FRAMES = 2
