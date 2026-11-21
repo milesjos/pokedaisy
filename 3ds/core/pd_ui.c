@@ -92,11 +92,15 @@ int ui_bar_count(const struct pd_ui* ui) {
     return n;
 }
 
+// TAB BAR's rows: only the tabs this game has (GitHub #1346: CHEEVOS, CARD and NUZLOCKE were offered on games without
+// them and never showed). The bits stay per tab, so a tab picked in another game is still on there.
 int ui_configurable_tabs(const struct pd_ui* ui, enum pd_tab out[UI_BAR_CHOICES]) {
     int n = 0;
     for (int i = 0; i < UI_BAR_CHOICES; i++) {
         const enum pd_tab tab = UI_BAR_CHOICE[i];
-        if (!ui->availableTabs || (ui->availableTabs & (1u << tab))) out[n++] = tab;
+        if (ui->drawnGame || ui->content ? ui_tab_available(ui, ui->drawnGame, tab)
+                                         : !ui->availableTabs || (ui->availableTabs & (1u << tab)))
+            out[n++] = tab;
     }
     return n;
 }
