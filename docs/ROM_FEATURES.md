@@ -476,9 +476,10 @@ change to any of the places listed under "Where it's decided" updates its rows h
     PC anywhere and FLY ran headless through its own script engine and flight task (landed in Pallet Town); WILD ENCOUNTERS'
     cart rates come from its map headers and encounter archive (`NdsArt.readOrigin`). Its battle engine is its own (a
     manager at 0x02255BAC, no BattleSystem): the BATTLE tab reads its battle objects (`Gen4ManagedBattle`). Its commands and
-    moves sit where HeartGold's do, so BATTLE BUTTONS press them with HeartGold's taps (`NdsBattleTaps.GEN4`): its battle
+    moves sit where HeartGold's do, so BATTLE BUTTONS press them with HeartGold's taps (`NdsBattleTaps.HEARTGOLD`): its battle
     UI's input handler is set while it waits (+0x238 -> +0x10) and another UI object (+0x234) says which panel at +0x580
-    (5 the commands, 2 the moves, 3 the party; `readManagedBattleInput`, `battleTouch`), checked headless in a wild and a
+    (5 the commands, 2 the moves, 3 the bag or the party, told apart by the panel's handler at +0x57C;
+    `readManagedBattleInput`, `battleTouch`), checked headless in a wild and a
     trainer battle. The party and any other panel float the game's touch screen in (DS LAYOUT), and SMART FF slows down
     while it waits. No POKéMON switch (its party panel isn't HeartGold's). On the way back to the commands after a turn
     the panel id reads 2 for under 15 frames. EXPAND and STEADY music work as HeartGold's (widecheck's overlap as US HeartGold's).

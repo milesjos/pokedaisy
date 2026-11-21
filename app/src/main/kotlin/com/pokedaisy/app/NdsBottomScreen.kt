@@ -221,9 +221,25 @@ class NdsBottomHost(
 
     /** Shows the companion ([on]) or the touch screen, and tells [onSwitch] when that's a change. */
     fun show(on: Boolean) {
+        raised = false
         if (on == showingCompanion) return
         apply(on)
         onSwitch(on)
+    }
+
+    /** The touch screen put up by [raiseTouch], to be given back to the companion. */
+    private var raised = false
+
+    /** A battle's bag or party is open on the touch screen ([up]): it shows in the companion's place until it closes, then
+     * the companion comes back. Not the player's pick, so not saved; a switch of theirs meanwhile stands. */
+    fun raiseTouch(up: Boolean) {
+        if (up && showingCompanion) {
+            raised = true
+            apply(false)
+        } else if (!up && raised) {
+            raised = false
+            if (!showingCompanion) apply(true)
+        }
     }
 
     private fun apply(on: Boolean) {

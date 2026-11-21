@@ -2900,6 +2900,8 @@ class PokeDaisyActivity : Activity() {
                         nowPlaying()
                     }
                 }
+                // A DS battle's bag or party, which two screens keep behind the companion: its touch screen shows for it.
+                if (romIsNds) runOnUiThread { syncDsBattleScreen(snap) }
                 // AUTO REFILL: another REPEL on before the one working runs out.
                 updateRepelRefill(snap)
                 // SHINY ALERT: the hunt's count, and a shiny foe said out loud.
@@ -4025,6 +4027,16 @@ class PokeDaisyActivity : Activity() {
         mainCompanionOwner = null
         (stage.parent as? android.view.ViewGroup)?.removeView(stage)
         setContentView(stage)
+    }
+
+    /** The game's own bag, or its party where the companion has no switch, open in a DS battle: on two screens the touch
+     * screen takes the companion's place while it's up ([NdsBottomHost.raiseTouch]). Opened by the companion's BAG /
+     * POKéMON, it was out of sight and the companion's BACK page the only thing showing. */
+    private fun syncDsBattleScreen(snap: com.pokedaisy.app.companion.data.SnapshotView) {
+        val state = snap.battleInputState
+        val up = snap.inBattle && (state == com.pokedaisy.app.companion.data.BATTLE_INPUT_BAG_OPEN ||
+            (state == com.pokedaisy.app.companion.data.BATTLE_INPUT_PARTY_OPEN && !battleInput.canSwitch))
+        dsBottom?.raiseTouch(up)
     }
 
     /** A game with a touch screen of its own (DS, 3DS): on two screens that screen goes where a GBA game's companion
