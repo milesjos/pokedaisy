@@ -176,11 +176,8 @@ const petals = [[4, 22, 1, 0, 22], [91, 10, 2, 4, 26], [70, 62, 1, 9, 24], [10, 
             <a href={tr.path(href)} aria-current={here === href || (href === '/docs/' && path.startsWith('/docs/')) ? 'page' : undefined}>{tr(label)}</a>
           ))}
         </nav>
-        <!-- The community and the page's look, beside the links (on phones: on the first row, the links under it). -->
+        <!-- The source and the page's look, beside the links (on phones: on the first row, the links under it). -->
         <div class="bar-tools">
-          <a href={DISCORD_URL} class="btn f-discord h-discordHot small discord-top" aria-label={tr('PokeDaisy on Discord')}>
-            <Pixel name="discord" scale={0.75} /><span class="discord-label">DISCORD</span>
-          </a>
           <a href={REPO_URL} class="icon-link gh-top" aria-label="GitHub"><Pixel name="github" scale={0.75} /></a>
           <button type="button" class="icon-link scheme-btn" data-scheme-toggle aria-label={tr('Dark mode')} title={tr('Dark mode')} aria-pressed="false">
             <span class="to-dark"><Pixel name="moon" scale={0.75} /></span>
@@ -344,14 +341,11 @@ const petals = [[4, 22, 1, 0, 22], [91, 10, 2, 4, 26], [70, 62, 1, 9, 24], [10, 
     --line: rgba(29, 27, 38, 0.12);
   }
   /* Between the two-row layout and a wide window, a tighter nav: the longest language's labels (German, Spanish),
-     Discord, GitHub, the light switch, the coffee button and the language picker then fit in one row from 1100px up. */
+     GitHub, the light switch, the coffee button and the language picker then fit in one row from 1100px up. */
   @media (min-width: 1101px) and (max-width: 1260px) {
     .topbar .bar { gap: 14px; }
     .topbar .links { font-size: var(--t-xs); gap: 0; }
     .topbar .links a { padding: 6px 7px; }
-    /* No room for Discord's word here: its logo alone, still a button. */
-    .discord-label { display: none; }
-    .discord-top { padding: calc(var(--px) * 2) calc(var(--px) * 3); }
   }
   /* Narrow phones: COFFEE's word goes, so the first row holds everything. */
   @media (max-width: 480px) {
@@ -442,7 +436,6 @@ const petals = [[4, 22, 1, 0, 22], [91, 10, 2, 4, 26], [70, 62, 1, 9, 24], [10, 
   .icon-link:focus-visible { outline: var(--px) dashed var(--red); outline-offset: var(--px); }
   .bar-tools { display: flex; align-items: center; gap: 2px; }
   .bar-tools .icon-link { min-width: 40px; }
-  .discord-top { gap: 10px; padding: calc(var(--px) * 2) calc(var(--px) * 4); }
   .scheme-btn .to-light, :root[data-scheme='dark'] .scheme-btn .to-dark { display: none; }
   :root[data-scheme='dark'] .scheme-btn .to-light { display: inline-flex; }
   /* A page with a game's own look keeps it: no switch there. */
@@ -473,11 +466,7 @@ const petals = [[4, 22, 1, 0, 22], [91, 10, 2, 4, 26], [70, 62, 1, 9, 24], [10, 
     .links a { white-space: nowrap; }
     .bar-tools { margin-left: auto; }
   }
-  @media (max-width: 560px) {
-    .discord-label { display: none; }
-    .discord-top { padding: calc(var(--px) * 2) calc(var(--px) * 2); margin-right: 2px; }
-  }
-  /* Phones: the name, Discord, GitHub, the light switch, the coffee cup and the language on one row. */
+  /* Phones: the name, GitHub, the light switch, the coffee cup and the language on one row. */
   @media (max-width: 440px) {
     .topbar .bar { column-gap: 6px; }
     .brand { gap: 8px; font-size: var(--t-m); }

@@ -53,6 +53,16 @@ const more = [
   ['clock', msg('STATUS BAR'), msg('Game, place, money, clock and battery in a strip above the game.')],
 ];
 const media = (name: string) => `/media/${name}`;
+// The hero's shots, scaled down ahead (scripts/hero-shots.mjs, lanczos) so the browser never shrinks them more than
+// ~1.5x itself: its own bilinear step from 1240 px to a 120-350 px screen left text and edges jagged. `sizes` follows
+// the screens' measured widths: stacked (960px and under), a small window, a wide one (the screens stop growing ~1440px). The Thor's top screen plays
+// the flight, a 720 px copy of the clip.
+const HERO_WIDTHS = [200, 320, 480, 720];
+const heroSrcset = (name: string) => HERO_WIDTHS.map((w) => `/media/hero/${name}-${w}.webp ${w}w`).join(', ');
+const HERO_SIZES = {
+  bottom: '(max-width: 960px) 30vw, (max-width: 1300px) 15.5vw, 200px',
+  single: '(max-width: 960px) 50vw, (max-width: 1300px) 23vw, 320px',
+};
 const ticker = ['GB · GBC · GBA · DS', msg('TWO SCREENS OR ONE'), msg('PARTY'), msg('BAG'), msg('BATTLE'), msg('MAP'), msg('DEX'), msg('GUIDE'), msg('TRAINER CARD'), msg('SAVE STATES'), msg('HUD'), msg('QUICK MENU'), msg('EXPAND'), msg('PC ANYWHERE'), msg('FREE FLIGHT'), msg('FAST-FORWARD'), msg('SHADERS'), msg('ACHIEVEMENTS')]
   .map((t) => tr(t)).concat(tr('{n} GAMES', { n: gameCount }));
 const title = 'POKEDAISY'.split('');
@@ -104,17 +114,17 @@ const title = 'POKEDAISY'.split('');
         <div class="duo-dual">
           <HeroDevice>
             <div slot="top" class="screen-shots">
-              <video class="on" src={media('free-flight.mp4')} poster={media('free-flight-poster.webp')} autoplay muted loop playsinline aria-label={tr('Take off and fly anywhere')} data-autoplay></video>
+              <video class="on" src={media('hero/free-flight-720.mp4')} poster={media('hero/free-flight-poster-720.webp')} autoplay muted loop playsinline aria-label={tr('Take off and fly anywhere')} data-autoplay></video>
             </div>
             <div slot="bottom" class="screen-shots" data-cycle="3200">
-              {companion.slice(0, 5).map(([shot, name], i) => <img src={media(`companion-${shot}.webp`)} alt={tr('The companion\'s {tab}', { tab: tr(name) })} class:list={[i === 0 && 'on']} loading={i === 0 ? 'eager' : 'lazy'} decoding="async" />)}
+              {companion.slice(0, 5).map(([shot, name], i) => <img src={media(`hero/companion-${shot}-480.webp`)} srcset={heroSrcset(`companion-${shot}`)} sizes={HERO_SIZES.bottom} alt={tr('The companion\'s {tab}', { tab: tr(name) })} class:list={[i === 0 && 'on']} loading={i === 0 ? 'eager' : 'lazy'} decoding="async" />)}
             </div>
           </HeroDevice>
         </div>
         <div class="duo-single">
           <HeroSingleDevice>
             <div slot="screen" class="screen-shots" data-cycle="3200" data-offset="1600">
-              {expandShots.slice(1, 6).map(([shot, game], i) => <img src={media(`${shot}.webp`)} alt={tr('{game} with EXPAND', { game })} class:list={[i === 0 && 'on']} loading={i === 0 ? 'eager' : 'lazy'} decoding="async" />)}
+              {expandShots.slice(1, 6).map(([shot, game], i) => <img src={media(`hero/${shot}-480.webp`)} srcset={heroSrcset(shot)} sizes={HERO_SIZES.single} alt={tr('{game} with EXPAND', { game })} class:list={[i === 0 && 'on']} loading={i === 0 ? 'eager' : 'lazy'} decoding="async" />)}
             </div>
           </HeroSingleDevice>
         </div>
