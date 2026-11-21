@@ -15,6 +15,7 @@
 #include <GPU3D_Soft.h>
 
 #include "pk_nds_platform.h"
+#include "pk_nds_bigmap.h"
 #include "pk_nds_field.h"
 #include "pk_nds_call.h"
 #include "pk_nds_wide.h"
@@ -38,6 +39,7 @@ using namespace melonDS;
 
 static std::string savePath;
 static NDS* nds = nullptr;
+static const PkNdsBigMap* bigMap = nullptr;   // wide map loading's table (pk_nds_bigmap_*), NULL for a cart without one
 
 // watch LO HI [r|w|rw] [N]: the ARM9's own reads / writes of main RAM in [LO, HI) reported with its registers (the
 // interpreter only: the JIT's fast paths skip the bus). How the Gen 5 addresses were traced back to code.
@@ -298,6 +300,7 @@ static void runFrames(int n, u32 keys)
         inFrame = true;
         nds->RunFrame();
         inFrame = false;
+        if (bigMap) pk_nds_bigmap_frame(bigMap, *nds);
         frameCount++;
         static int wasBattle = 0;
         int battle = 0, inBattle = 0, battle3d = 0;
@@ -525,6 +528,7 @@ int main(int argc, char** argv)
     std::vector<u8> rom = readFile(argv[1]);
     if (rom.empty()) { fprintf(stderr, "can't read %s\n", argv[1]); return 1; }
     std::vector<u8> save = readFile(argv[2]);
+    bigMap = pk_nds_bigmap_for(rom.data());
 
     static PkNdsHost host {onSave, onStop, nullptr};
 
@@ -557,7 +561,9 @@ int main(int argc, char** argv)
     if (!cart) { fprintf(stderr, "not a DS ROM\n"); return 1; }
     nds->SetNDSCart(std::move(cart));
     nds->Reset();
+    if (bigMap) pk_nds_bigmap_ram(bigMap, *nds);
     nds->SetupDirectBoot("rom.nds");
+    if (bigMap) pk_nds_bigmap_boot(bigMap, *nds);
     // The 3D on its own thread, as the app runs it (pk_nds_init); `threaded 0` puts it on this one
     static_cast<SoftRenderer&>(nds->GPU.GetRenderer3D()).SetThreaded(true, nds->GPU);
     nds->Start();

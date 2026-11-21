@@ -913,13 +913,14 @@ bool pk_ndsb_frame_drawn(void) { return ds && ds->drawn; }
 
 int pk_ndsb_wide_scene(void)
 {
+    // As pk_nds.cpp's: a text box on the field is the field, so DS signs and conversations keep the zoom.
     int b = ds ? ds->fieldBits : 0;
     if (b & PK_NDS_FIELD_BATTLE) return 4;
     u32 mb = ds ? ds->nds->GPU.MasterBrightnessA : 0;
     if (((mb >> 14) == 1 || (mb >> 14) == 2) && (mb & 0x1F) >= 16) return 5;
     if (b & PK_NDS_FIELD_MENU) return 6;
     if (!(b & PK_NDS_FIELD_SCREEN)) return 4;
-    return (b & PK_NDS_FIELD_TEXT) ? 1 : 0;
+    return 0;
 }
 
 int pk_ndsb_fade(void)

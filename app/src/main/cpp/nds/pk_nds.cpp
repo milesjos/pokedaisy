@@ -12,6 +12,7 @@
 #include "pk_nds.h"
 #include "pk_nds_cores.h"
 #include "pk_nds_platform.h"
+#include "pk_nds_bigmap.h"
 #include "pk_nds_field.h"
 #include "pk_nds_call.h"
 #include "pk_nds_wide.h"
@@ -74,6 +75,7 @@ struct Ds {
     int audioFrames = 0;
     int sampleRate = 48000;
     const PkNdsFieldGame* field = nullptr;   // the field read's table entry for this cart, if any
+    const PkNdsBigMap* bigMap = nullptr;   // wide map loading's table and heap, if this cart has them
     bool wide = false;                       // EXPAND on (pk_nds_wide_enable)
     bool draw = true, drawNext = true;       // this frame / the next one is shown (pk_nds_set_draw: fast-forward's skips)
     bool drawn = true;                       // the last frame was drawn (pk_nds_frame_drawn)
@@ -216,6 +218,7 @@ bool pk_ndsm_init(const char* romPath, const char* savePath, int sampleRate)
     ds = new Ds();
     ds->host = PkNdsHost {onSave, onStop, nullptr};
     ds->sampleRate = sampleRate;
+    ds->bigMap = pk_nds_bigmap_for(rom.get());
     pkNdsSetLog(onLog);
 
     std::vector<u8> save;
@@ -253,7 +256,9 @@ bool pk_ndsm_init(const char* romPath, const char* savePath, int sampleRate)
     }
     ds->nds->SetNDSCart(std::move(cart));
     ds->nds->Reset();
+    if (ds->bigMap) pk_nds_bigmap_ram(ds->bigMap, *ds->nds);
     ds->nds->SetupDirectBoot("rom.nds");
+    if (ds->bigMap) pk_nds_bigmap_boot(ds->bigMap, *ds->nds);
     // The 3D on melonDS's render thread, beside the emulation (HeartGold's overworld, headless: a quarter less time a
     // frame). From 2026-10-20 to 2026-11-09 it ran on the emulation thread: with fast-forward's frame skip, a frame
     // shown read 3D lines not drawn yet on the Thor (black from a row down). The cause was a render started for a
@@ -351,6 +356,7 @@ void pk_ndsm_run_frame(void)
     nds->GPU.SkipDraw = !draw;
     nds->GPU.SkipDrawNext = !drawNext;
     nds->RunFrame();
+    if (ds->bigMap) pk_nds_bigmap_frame(ds->bigMap, *nds);
     int fb = nds->GPU.FrontBuffer;
     // GPU mode: the framebuffers hold the 2D lines for the compositor; the screens come from it (below).
     if (draw && !gpu) {
@@ -464,6 +470,12 @@ bool pk_ndsm_load_state(const char* path)
     if (!loaded) {
         LOGE("loadstate failed: %s", path);
         return false;
+    }
+    // A state made before the 8 MB patch keeps the game's own map window: drop it for this session rather than grow a heap
+    // that state made at 4 MB.
+    if (ds->bigMap && !pk_nds_bigmap_state(ds->bigMap, *ds->nds)) {
+        LOGI("state made before wide map loading: the game's own map window");
+        ds->bigMap = nullptr;
     }
     pk_nds_call_reset();
     // The state put its save memory back: the file follows, as on the GBA.
@@ -759,7 +771,8 @@ void pk_nds_set_window(ANativeWindow* window)
 
 int pk_ndsm_wide_scene(void)
 {
-    // WideCamera.SCENE_FIELD 0, _TEXT 1, _OFF 4, _FADE 5, _MENU 6
+    // WideCamera.SCENE_FIELD 0, _OFF 4, _FADE 5, _MENU 6. A text box on the field is the field: the DS games keep the
+    // zoom they were given through signs and conversations (a pull-in there jumped the view every time one opened).
     int b = ds ? ds->fieldBits : 0;
     if (b & PK_NDS_FIELD_BATTLE) return 4;
     // The top screen faded all the way to black or white (master brightness, mode 1 / 2 at 16): between two maps (a
@@ -770,7 +783,7 @@ int pk_ndsm_wide_scene(void)
     }
     if (b & PK_NDS_FIELD_MENU) return 6;
     if (!(b & PK_NDS_FIELD_SCREEN)) return 4;
-    return (b & PK_NDS_FIELD_TEXT) ? 1 : 0;
+    return 0;
 }
 
 static int fadeFactor(u16 mb)
