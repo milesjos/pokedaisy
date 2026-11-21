@@ -61,6 +61,10 @@ typedef struct PkNdsFieldGame {
     uint32_t battleManagerPtr;
     int offBattleUi;
     int offUiHandler;
+    // Which panel waits: the manager's UI object at offBattlePanels, its id at offPanelId (Origin: 5 the commands, 2 the
+    // moves, 3 the party; Gen4Reader.kt's readManagedBattleInput reads the same).
+    int offBattlePanels;
+    int offPanelId;
 } PkNdsFieldGame;
 
 // pk_wide.h's PK_FIELD_* bits, which the engine already reads, plus two the DS sets:
