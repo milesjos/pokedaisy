@@ -2906,6 +2906,8 @@ class PokeDaisyActivity : Activity() {
                         nowPlaying()
                     }
                 }
+                // A DS battle's bag or party is the touch screen's: on two screens it shows in the companion's place.
+                if (romIsNds && engine.dsScreenBackMapped && (snap.inBattle || dsTouchRaised)) runOnUiThread { syncDsBattleScreen(snap) }
                 // AUTO REFILL: another REPEL on before the one working runs out.
                 updateRepelRefill(snap)
                 // SHINY ALERT: the hunt's count, and a shiny foe said out loud.
@@ -4031,6 +4033,21 @@ class PokeDaisyActivity : Activity() {
         mainCompanionOwner = null
         (stage.parent as? android.view.ViewGroup)?.removeView(stage)
         setContentView(stage)
+    }
+
+    /** The last [syncDsBattleScreen] wanted the touch screen up: one more sample after the battle gives the companion back. */
+    @Volatile private var dsTouchRaised = false
+
+    /** The game's own bag, or its party where the companion has no switch, open in a HeartGold / SoulSilver battle: on two
+     * screens the touch screen takes the companion's place while it's up ([NdsBottomHost.raiseTouch]), since the screen
+     * is played by touch. Only games whose return arrow BACK taps ([EmulatorEngine.dsScreenBackMapped]). */
+    private fun syncDsBattleScreen(snap: com.pokedaisy.app.companion.data.SnapshotView) {
+        val state = snap.battleInputState
+        val up = snap.inBattle && (state == com.pokedaisy.app.companion.data.BATTLE_INPUT_BAG_OPEN ||
+            (state == com.pokedaisy.app.companion.data.BATTLE_INPUT_PARTY_OPEN && !battleInput.canSwitch))
+        dsTouchRaised = up
+        // The buttons go with the screen: on the companion's they'd steer a page nobody sees.
+        if (dsBottom?.raiseTouch(up) == true) setBottomFocus(false, keepScreen = true)
     }
 
     /** A game with a touch screen of its own (DS, 3DS): on two screens that screen goes where a GBA game's companion
@@ -5385,11 +5402,12 @@ class PokeDaisyActivity : Activity() {
         return snap.hasData && !snap.inBattle
     }
 
-    private fun setBottomFocus(on: Boolean) {
+    /** [keepScreen]: the DS bottom screen is left as it is (a raised touch screen isn't the player's pick to save). */
+    private fun setBottomFocus(on: Boolean, keepScreen: Boolean = false) {
         if (bottomFocus.value == on) return
         bottomFocus.value = on
         // A DS game's second screen goes back to its touch screen with the buttons; a hidden upright companion comes up.
-        if (!on && twoScreenGame) dsBottom?.show(false)
+        if (!on && twoScreenGame && !keepScreen) dsBottom?.show(false)
         if (on && ::portraitPanel.isInitialized && portraitPanel.enabled) portraitPanel.reveal()
         // The player's held keys let go in the game (which runs on), and the other way round.
         input.releaseAll()
