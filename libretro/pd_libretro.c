@@ -565,10 +565,9 @@ static void area_taps(struct area_tap *t, int n, int src) {
     t[d].n = k;
   }
 }
-/* The quick menu drawn at w x h laid over the whole canvas, each canvas pixel the area-weighted average of the menu
- * pixels under it (alpha-weighted, so the menu's see-through parts don't darken its edges). Unlike nearest-neighbour
- * at 1.5x it keeps the pixel font's strokes even, softened instead of alternately one and two pixels wide. */
-static void blend_overlay_area(const uint32_t *px, int w, int h, uint32_t *scratch) {
+/* The overlay's own pixels spread over the whole canvas (an area-weighted resample, alpha kept), for a ZOOM step's
+ * HUD: unlike nearest-neighbour at 1.5x it keeps the pixel font's strokes even. */
+static void spread_overlay(const uint32_t *px, int w, int h, uint32_t *out) {
   static struct area_tap tx[CANVAS_MAX_W], ty[CANVAS_MAX_H];
   area_taps(tx, CW, w);
   area_taps(ty, CH, h);
@@ -576,9 +575,9 @@ static void blend_overlay_area(const uint32_t *px, int w, int h, uint32_t *scrat
     for (int x = 0; x < CW; x++) {
       uint32_t aw = 0, r = 0, g = 0, b = 0;
       for (int ky = 0; ky < ty[y].n; ky++) {
-        const uint32_t *row = px + (size_t)ty[y].i[ky] * w;
+        const uint32_t *row = px + (size_t) ty[y].i[ky] * w;
         for (int kx = 0; kx < tx[x].n; kx++) {
-          const uint32_t p = row[tx[x].i[kx]], wa = (p >> 24) * (uint32_t)(ty[y].w[ky] * tx[x].w[kx]);
+          const uint32_t p = row[tx[x].i[kx]], wa = (p >> 24) * (uint32_t) (ty[y].w[ky] * tx[x].w[kx]);
           aw += wa;
           r += (p >> 16 & 255) * (wa >> 8);
           g += (p >> 8 & 255) * (wa >> 8);
@@ -586,8 +585,50 @@ static void blend_overlay_area(const uint32_t *px, int w, int h, uint32_t *scrat
         }
       }
       const uint32_t a = aw >> 16, d = aw >> 8; // alpha out of 255; the colours' common weight
-      scratch[(size_t)y * CW + x] = a && d ? a << 24 | (r / d) << 16 | (g / d) << 8 | (b / d) : 0;
+      out[(size_t) y * CW + x] = a && d ? a << 24 | (r / d) << 16 | (g / d) << 8 | (b / d) : 0;
     }
+}
+/* The HUD's picture over the four corners of the canvas, [pct] of the canvas's size: each quarter of the picture keeps
+ * its own corner, so SIZE's smaller HUD (half) and a ZOOM step's bigger canvas never pull it toward the middle. The
+ * source block of each pixel is averaged, so half-size keeps the pixel font's strokes. */
+static void hud_quarters(const uint32_t *px, int w, int h, uint32_t *out, int bw, int bh, int pct) {
+  const int dw = bw * pct / 100, dh = bh * pct / 100;
+  memset(out, 0, (size_t) bw * bh * sizeof *out);
+  if (dw < 2 || dh < 2)
+    return;
+  for (int qy = 0; qy < 2; qy++)
+    for (int qx = 0; qx < 2; qx++) {
+      const int sx0 = w * qx / 2, sxe = w * (qx + 1) / 2, sy0 = h * qy / 2, sye = h * (qy + 1) / 2;
+      const int dx0 = qx ? bw - dw / 2 : 0, dxe = qx ? bw : dw / 2;
+      const int dy0 = qy ? bh - dh / 2 : 0, dye = qy ? bh : dh / 2;
+      const int sw = sxe - sx0, sh = sye - sy0, dqw = dxe - dx0, dqh = dye - dy0;
+      for (int y = dy0; y < dye; y++)
+        for (int x = dx0; x < dxe; x++) {
+          int ax = sx0 + (int) ((long) (x - dx0) * sw / dqw), bx = sx0 + (int) ((long) (x + 1 - dx0) * sw / dqw);
+          int ay = sy0 + (int) ((long) (y - dy0) * sh / dqh), by = sy0 + (int) ((long) (y + 1 - dy0) * sh / dqh);
+          if (bx <= ax)
+            bx = ax + 1;
+          if (by <= ay)
+            by = ay + 1;
+          unsigned r = 0, g = 0, b = 0, sum = 0;
+          for (int sy = ay; sy < by; sy++)
+            for (int sx = ax; sx < bx; sx++) {
+              const uint32_t p = px[(size_t) sy * w + sx], a = p >> 24;
+              r += (p >> 16 & 255) * a;
+              g += (p >> 8 & 255) * a;
+              b += (p & 255) * a;
+              sum += a;
+            }
+          out[(size_t) y * bw + x] = sum ? 0xFF000000u | (r / sum) << 16 | (g / sum) << 8 | (b / sum) : 0;
+        }
+    }
+}
+
+/* The quick menu drawn at w x h laid over the whole canvas, each canvas pixel the area-weighted average of the menu
+ * pixels under it (alpha-weighted, so the menu's see-through parts don't darken its edges). Unlike nearest-neighbour
+ * at 1.5x it keeps the pixel font's strokes even, softened instead of alternately one and two pixels wide. */
+static void blend_overlay_area(const uint32_t *px, int w, int h, uint32_t *scratch) {
+  spread_overlay(px, w, h, scratch);
   blend_overlay(scratch, CW, CH, 1, 0, 0);
 }
 
@@ -622,7 +663,7 @@ static int heldFrames[NKEYS];
 static int quickBtn = L3, companionBtn = X, hudBtn = -1; // key indices, -1 none (from settings: key_of)
 static unsigned gameKeys; // keys the layer presses for the game (BIKE's SELECT)
 static int gameKeyFrames;
-static int hudOx, hudOy, hudScale = 1; // where draw_hud last put the HUD on the canvas (hud_hit_at)
+static int hudOx, hudOy, hudTW, hudTH, hudScale = 1, hudPct = 100; // where draw_hud last put the HUD (hud_hit_at)
 static unsigned shortcutKeys, shortcutBlocked;
 static bool shortcutExclusive;
 static bool maskGame;     // while an overlay is up the game sees no keys
@@ -722,6 +763,7 @@ static struct hud_state hudState = {.wild = -1, .focus = -1};
 static struct hud_hits hudHits;
 static bool hudFocus, hudShown;
 static uint32_t *hudPixels;
+static uint32_t *hudSpreadPx; // the HUD's 1x layout spread over a ZOOM canvas, blended 1:1 (draw_hud)
 static uint32_t hudDrawnKey;
 static int hudW, hudH;
 static int fieldFlags, hudFieldFrames;
@@ -879,26 +921,42 @@ static int hud_wild_uncaught(const struct pd_game *g, const struct pd_snapshot *
   return n ? left : -1;
 }
 
+static int want_canvas(void);
+static int want_zoom(void);
+static void canvas_for(int fw, int fh, int kind, int extra, int *w, int *h);
+
 /* The HUD over the game's own picture, a canvas pixel a game pixel: SIZE picks the mini HUD (SMALL, NORMAL) or the full
  * one (LARGE). */
 static void draw_hud(void) {
   int gs = game_scale(gameW, gameH);
   int ax = (CW - (int)gameW * gs) / 2, ay = (CH - (int)gameH * gs) / 2, aw = (int)gameW * gs, ah = (int)gameH * gs;
+  bool base = false; // a ZOOM step: the HUD keeps the 1x picture's layout, so the frontend's smaller scale leaves it the same
   if (wideReady) { // the wide view (EXPAND, ZOOM OUT) is what is on screen: anchor to it, not to the centred game picture
-    int ws = game_scale(wideW, wideH);
+    const int ws = 1; // wide_window's pixels, as draw_game draws them
     aw = (int)wideW * ws;
     ah = (int)wideH * ws;
     ax = (CW - aw) / 2;
     ay = (CH - ah) / 2;
+    base = panelW && want_zoom() > 0 && !companion;
   }
   // SMALL / NORMAL: the mini HUD (a core's canvas is the game's own pixels, shown 3x to 6x); LARGE: the full one.
   hudState.mini = settings.hudSize != PD_HUD_LARGE;
   int scale = canvasScale;
   int w = aw / scale, hh = ah / scale;
+  if (base) { // the canvas at 1x, the HUD's layout at every step
+    int bw = 0, bh = 0;
+    const int kind = want_canvas();
+    canvas_for((int)gameW, (int)gameH, kind == CANVAS_MENU ? CANVAS_EXPAND : kind, 0, &bw, &bh);
+    if (bw > 0 && bh > 0)
+      w = bw, hh = bh;
+  }
+  const bool small = settings.hudSize != PD_HUD_LARGE; // SIZE's smaller HUD: half the pixels, at the canvas's corners
   if (!hudPixels)
     hudPixels = malloc((size_t)CANVAS_MAX_W * CANVAS_MAX_H * sizeof *hudPixels);
   if (!hudPixels)
     return;
+  if (scale == 1 && !hudSpreadPx)
+    hudSpreadPx = malloc((size_t)CANVAS_MAX_W * CANVAS_MAX_H * sizeof *hudSpreadPx);
   uint32_t key = hud_key(&game, &snap, &hudState, &settings) ^ (uint32_t)(w * 65599 + hh);
   if (key != hudDrawnKey || w != hudW || hh != hudH) {
     struct pd_canvas hc;
@@ -909,8 +967,23 @@ static void draw_hud(void) {
     hudW = w;
     hudH = hh;
   }
+  if (scale == 1 && hudSpreadPx) { // at the window's corners whatever the step, and half size for SMALL and NORMAL
+    hudOx = hudOy = 0;
+    hudTW = CW;
+    hudTH = CH;
+    hudPct = small ? 50 : 100;
+    hudScale = 1;
+    if (hudShown) {
+      hud_quarters(hudPixels, w, hh, hudSpreadPx, CW, CH, hudPct);
+      blend_overlay(hudSpreadPx, CW, CH, 1, 0, 0);
+    }
+    return;
+  }
+  hudPct = 100;
   hudOx = ax + (aw - w * scale) / 2;
   hudOy = ay + (ah - hh * scale) / 2;
+  hudTW = w * scale;
+  hudTH = hh * scale;
   hudScale = scale;
   if (hudShown)
     blend_overlay(hudPixels, w, hh, scale, hudOx, hudOy);
@@ -1577,12 +1650,14 @@ RETRO_API void retro_unload_game(void) {
   free(cvs);
   free(out565);
   free(hudPixels);
+  free(hudSpreadPx);
   free(ovPixels);
   free(ovScratch);
   ovPixels = ovScratch = NULL;
   cvs = NULL;
   out565 = NULL;
   hudPixels = NULL;
+  hudSpreadPx = NULL;
   haveGame = false;
 }
 
@@ -1667,11 +1742,39 @@ static void touch_poll(void) {
 }
 static bool touch_tapped(void) { return touchWas && !touchDown; }
 static int hud_hit_at(int x, int y) {
-  // hudHits are in the HUD's own canvas, which draw_hud blends at (hudOx, hudOy), hudScale canvas pixels a pixel.
-  if (hudScale < 1 || x < hudOx || y < hudOy)
+  // hudHits are in the HUD's own canvas, which draw_hud puts at (hudOx, hudOy) in a hudTW x hudTH box.
+  if (hudScale < 1 || x < hudOx || y < hudOy || x >= hudOx + hudTW || y >= hudOy + hudTH)
     return -1;
-  x = (x - hudOx) / hudScale;
-  y = (y - hudOy) / hudScale;
+  x -= hudOx;
+  y -= hudOy;
+  if (hudPct < 100) { // the quarters (hud_quarters): each half of the HUD sits at its own edge of the box
+    const int qw = hudTW * hudPct / 200, qh = hudTH * hudPct / 200;
+    if (qw < 1 || qh < 1)
+      return -1;
+    if (x < hudTW / 2) {
+      if (x >= qw)
+        return -1;
+      x = x * (hudW / 2) / qw;
+    } else {
+      const int ox = hudTW - qw;
+      if (x < ox)
+        return -1;
+      x = hudW / 2 + (x - ox) * (hudW - hudW / 2) / qw;
+    }
+    if (y < hudTH / 2) {
+      if (y >= qh)
+        return -1;
+      y = y * (hudH / 2) / qh;
+    } else {
+      const int oy = hudTH - qh;
+      if (y < oy)
+        return -1;
+      y = hudH / 2 + (y - oy) * (hudH - hudH / 2) / qh;
+    }
+  } else {
+    x = x * hudW / hudTW;
+    y = y * hudH / hudTH;
+  }
   for (int i = 0; i < hudHits.n; i++)
     if (x >= hudHits.at[i].x && x < hudHits.at[i].x + hudHits.at[i].w && y >= hudHits.at[i].y &&
         y < hudHits.at[i].y + hudHits.at[i].h)

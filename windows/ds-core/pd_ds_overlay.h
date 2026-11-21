@@ -23,9 +23,15 @@ bool overlay_menu_open();
 bool overlay_touch_screen();
 // This frame's field read says a battle runs: the core lets EXPAND carry the battle into the wide margins.
 bool overlay_battle();
+// The companion's ASPECT / ZOOM (its SETTINGS, the app's SCREEN group): the core lays the wide picture out for them.
+// ZOOM is the app's list step, 0 = 1x (EXPAND as it was).
+bool overlay_wide();
+int overlay_zoom();
 // Where this frame puts the game's top screen in the picture: the HUD (when the settings have it on) is drawn there, at
 // the screen's own 256x192, over the field and under any overlay. Called once a frame, before overlay_compose.
 void overlay_view(int topX, int topY, bool topShown);
+// The HUD's 256x192 picture's box in the picture (the 1x top screen, scaled with the window): compose_layout.
+void overlay_hud_box(int x, int y, int w, int h);
 // A pointer press on the picture (the overlay's own size while it shows, canvas pixels): true when the companion, the
 // HUD or the quick menu takes it, so the game's touch screen doesn't. A click on a HUD part runs it; on a quick menu
 // tile, runs the tile; on the companion, its tab, row, button or gear.

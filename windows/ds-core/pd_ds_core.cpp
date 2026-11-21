@@ -3,9 +3,10 @@
 // functions (PC, FLY, ...), saves written the app's way, and melonDS states.
 //
 // The picture is the screen the game is on, in DS pixels, and the frontend scales it to the window:
-//   - EXPAND on (pokedaisy_aspect wide, the host's WIDESCREEN) and the field on show: the window is the whole canvas, the
-//     top screen in the middle and EXPAND's margins around it, as far as the window reaches (pokedaisy_panel, the
-//     frontend's window, is read every frame, so resizing and fullscreen re-lay it).
+//   - EXPAND on (the companion's ASPECT) and the field on show: the window is the whole canvas, the top screen in the
+//     middle and EXPAND's margins around it, as far as the window reaches (pokedaisy_panel, the frontend's window, is
+//     read every frame, so resizing and fullscreen re-lay it). ZOOM (the companion's row) grows that canvas 1.25x, 1.5x
+//     or 2x, and the frontend scales the whole picture down.
 //   - otherwise the two screens one above the other (top first), 256 x 384.
 // R2 shows the bottom screen (the touch screen) by itself, at the game's own size, until it's pressed again.
 #include "libretro.h"
@@ -62,7 +63,6 @@ ScreenRect touch_panel_rect(bool battle)
 }
 
 int panelW = 512, panelH = 384;
-bool wideAspect = true;
 bool touchView = false;
 bool padCombo = false;
 bool wideEnabled = false;
@@ -116,9 +116,6 @@ void read_options()
             panelH = h;
         }
     }
-    // The host's WIDESCREEN sends "expand" / "original" (libretro/pd_libretro.c's name for it).
-    if (option("pokedaisy_aspect", value))
-        wideAspect = value != "original" && value != "4:3" && value != "0";
 }
 
 // Where this frame goes: EXPAND's canvas when it can be wide (at least 3:2 and the field on show), the two screens when
@@ -133,20 +130,36 @@ void compose_layout()
         layout.h = PK_NDS_H;
         return;
     }
-    if (wideAspect && (long long) panelW * 10 >= (long long) panelH * 15) {
-        // EXPAND extends the field sideways, not above and below the screen: the canvas is exactly the screen's height
-        // and as wide as the window's shape makes it, so every margin it has is one the 3D fills. The width follows the
-        // window's own aspect, so the frontend has nothing left to letterbox either.
+    if (overlay_wide() && (long long) panelW * 10 >= (long long) panelH * 15) {
+        // EXPAND extends the field sideways, not above and below the screen: at 1x the canvas is exactly the window's
+        // shape, the screen's height, so every margin is one the 3D fills. A ZOOM step (the companion's SETTINGS, the
+        // app's SCREEN group) grows the canvas by 1.25x, 1.5x or 2x: the field keeps filling it and the frontend shows
+        // it at the next whole scale, which is more of the map with the game smaller. A field text box reads as the
+        // field, so the step stays through signs and conversations; everything else (a battle, a menu, a fade, a title)
+        // steps in to 1x whatever AUTO ZOOM IN says. Past the renderer's widest margins the step falls back.
+        static const int zooms[4][2] = {{4, 4}, {5, 4}, {6, 4}, {8, 4}};
+        int level = overlay_zoom();
+        if (pk_ndsm_wide_scene() != 0) level = 0;
+        const int baseW = std::max(PK_NDS_W, (int) llround((double) PK_NDS_H * panelW / panelH));
+        for (; level > 0; --level) {
+            const int w = std::max(PK_NDS_W, (int) llround((double) baseW * zooms[level][0] / zooms[level][1]));
+            const int h = (int) llround((double) PK_NDS_H * zooms[level][0] / zooms[level][1]);
+            if (w <= PK_NDS_W + 2 * 504 && h <= PK_NDS_H + 2 * 96) break; // pk_nds_wide.h's largest margins
+        }
         layout.mode = Layout::Wide;
-        layout.w = std::max(PK_NDS_W, (int) llround((double) PK_NDS_H * panelW / panelH));
-        layout.h = PK_NDS_H;
+        layout.w = std::max(PK_NDS_W, (int) llround((double) baseW * zooms[level][0] / zooms[level][1]));
+        layout.h = std::max(PK_NDS_H, (int) llround((double) PK_NDS_H * zooms[level][0] / zooms[level][1]));
         layout.x = (layout.w - PK_NDS_W) / 2;
-        layout.y = 0;
+        layout.y = (layout.h - PK_NDS_H) / 2;
+        // The HUD keeps the 1x picture's place and size on screen: its box is the 1x top screen, scaled with the window.
+        overlay_hud_box((baseW - PK_NDS_W) / 2 * zooms[level][0] / zooms[level][1], 0,
+                        PK_NDS_W * zooms[level][0] / zooms[level][1], PK_NDS_H * zooms[level][0] / zooms[level][1]);
         return;
     }
     layout.mode = Layout::Stacked;
     layout.w = PK_NDS_W;
     layout.h = PK_NDS_H * 2;
+    overlay_hud_box(0, 0, PK_NDS_W, PK_NDS_H);
 }
 
 inline uint32_t xrgb(uint32_t rgba)

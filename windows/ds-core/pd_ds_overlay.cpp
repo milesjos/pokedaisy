@@ -72,6 +72,9 @@ int hudFocus = -1;
 int hudWild = -1;
 int repelFull = 0;
 int viewX = 0, viewY = 0;                  // the top screen's corner in the game picture
+// The HUD's 256x192 picture's box in the picture: the 1x top screen's place and size on screen, so a ZOOM step's
+// smaller scale leaves it where it was and SIZE's smaller HUD stays its corners (draw_hud blends it there).
+int hudBoxX = 0, hudBoxY = 0, hudBoxW = PK_NDS_W, hudBoxH = PK_NDS_H;
 bool viewShown = false;                    // the top screen is the one in the picture
 bool pointerDown = false;                  // last frame's mouse / touch press, for a click on the HUD or the menu
 int frameFieldBits = 0;                    // this frame's field read, for the core's battle-wide picture
@@ -628,26 +631,70 @@ void draw_hud(std::vector<uint32_t>& frame, int w, int h)
                        &hudHits);
     hud_focus_draw(&c, &hudHits, hudFocus);
     if (hudHits.n <= 0) hudFocus = -1;
-    // Over the picture: a HUD pixel's alpha is how much of it the game shows through, as the quick menu's.
-    for (int y = 0; y < PK_NDS_H; ++y)
-        for (int x = 0; x < PK_NDS_W; ++x) {
-            const uint32_t p = hudPixels[(size_t) y * PK_NDS_W + x];
-            if (p == QUICK_CLEAR) continue;
-            uint32_t& old = frame[(size_t) (viewY + y) * w + viewX + x];
-            // ARGB where 0 means opaque (hud.c draws its icons in 24-bit colours), as the Linux core's blend reads it.
-            const unsigned a = (p >> 24) ? (p >> 24) : 255;
-            if (a >= 255) old = p;
-            else {
-                const unsigned inv = 255 - a;
-                old = 0xFF000000u | (((((p >> 16) & 0xFFu) * a + ((old >> 16) & 0xFFu) * inv) / 255) << 16)
-                                   | (((((p >> 8) & 0xFFu) * a + ((old >> 8) & 0xFFu) * inv) / 255) << 8)
-                                   | ((((p & 0xFFu) * a + (old & 0xFFu) * inv) / 255));
+    // Over the picture: a HUD pixel's alpha is how much of it the game shows through, as the quick menu's. The 256x192
+    // picture goes over the four corners of its box (the 1x top screen, scaled with the window), each quarter to its own
+    // corner, so a ZOOM step never pulls the HUD toward the middle; SMALL and NORMAL are half of it, a pixel the average
+    // of the picture pixels it covers. The boxes are clipped to the picture.
+    const int pct = shell.settings.hudSize == PD_HUD_LARGE ? 100 : 50;
+    const int bw = hudBoxW * pct / 100, bh = hudBoxH * pct / 100;
+    if (bw >= 2 && bh >= 2)
+        for (int qy = 0; qy < 2; ++qy)
+            for (int qx = 0; qx < 2; ++qx) {
+                const int sx0 = PK_NDS_W * qx / 2, sxe = PK_NDS_W * (qx + 1) / 2;
+                const int sy0 = PK_NDS_H * qy / 2, sye = PK_NDS_H * (qy + 1) / 2;
+                const int dx0 = hudBoxX + (qx ? hudBoxW - bw / 2 : 0), dxe = hudBoxX + (qx ? hudBoxW : bw / 2);
+                const int dy0 = hudBoxY + (qy ? hudBoxH - bh / 2 : 0), dye = hudBoxY + (qy ? hudBoxH : bh / 2);
+                const int sw = sxe - sx0, sh = sye - sy0, dqw = dxe - dx0, dqh = dye - dy0;
+                for (int y = dy0; y < dye; ++y)
+                    for (int x = dx0; x < dxe; ++x) {
+                        if (x < 0 || y < 0 || x >= w || y >= h) continue;
+                        const int ax = sx0 + (int) ((long) (x - dx0) * sw / dqw);
+                        int bx = sx0 + (int) ((long) (x + 1 - dx0) * sw / dqw);
+                        const int ay = sy0 + (int) ((long) (y - dy0) * sh / dqh);
+                        int by = sy0 + (int) ((long) (y + 1 - dy0) * sh / dqh);
+                        if (bx <= ax) bx = ax + 1;
+                        if (by <= ay) by = ay + 1;
+                        unsigned r = 0, g = 0, b = 0, sum = 0;
+                        for (int sy = ay; sy < by; ++sy)
+                            for (int sx = ax; sx < bx; ++sx) {
+                                const uint32_t p = hudPixels[(size_t) sy * PK_NDS_W + sx];
+                                if (p == QUICK_CLEAR) continue;
+                                // ARGB where 0 means opaque (hud.c draws its icons in 24-bit colours).
+                                const unsigned a = (p >> 24) ? (p >> 24) : 255;
+                                r += ((p >> 16) & 0xFFu) * a;
+                                g += ((p >> 8) & 0xFFu) * a;
+                                b += ((p & 0xFFu) * a);
+                                sum += a;
+                            }
+                        if (!sum) continue;
+                        const unsigned a = sum / ((bx - ax) * (by - ay));
+                        if (!a) continue;
+                        uint32_t& old = frame[(size_t) y * w + x];
+                        if (a >= 255) old = 0xFF000000u | (r / sum) << 16 | (g / sum) << 8 | (b / sum);
+                        else {
+                            const unsigned inv = 255 - a;
+                            old = 0xFF000000u | (((((r / sum) * a) + ((old >> 16) & 0xFFu) * inv) / 255) << 16)
+                                               | (((((g / sum) * a) + ((old >> 8) & 0xFFu) * inv) / 255) << 8)
+                                               | ((((b / sum) * a) + (old & 0xFFu) * inv) / 255);
+                        }
+                    }
             }
-        }
 }
 
 } // namespace
 
+void overlay_hud_box(int x, int y, int w, int h)
+{
+    hudBoxX = x;
+    hudBoxY = y;
+    hudBoxW = w < 1 ? 1 : w;
+    hudBoxH = h < 1 ? 1 : h;
+}
+bool overlay_wide() { return shell.settings.aspect != PD_ASPECT_ORIGINAL; }
+int overlay_zoom() {
+    const int zoom = shell.settings.zoom;
+    return zoom < 0 ? 0 : zoom > 3 ? 3 : zoom;
+}
 void overlay_load(const char* romPath, const char* saveDir)
 {
     overlay_reset();
@@ -690,6 +737,9 @@ void overlay_load(const char* romPath, const char* saveDir)
             hudItemIcons = ds_hud_item_icons(rom, companionGame);
         }
     }
+    // The desktop's picture can EXPAND and ZOOM (the wide renderer): the companion's SETTINGS gain the app's ASPECT,
+    // ZOOM and AUTO ZOOM IN rows (the Linux DS core doesn't set this and keeps its own list).
+    shell.hasExpand = true;
     shell.init(saveDir ? saveDir : "", 0, false);
     shell.set_game(companionGame, soulSilver);
     shell.dexArt = std::move(dexArt);
@@ -792,19 +842,45 @@ bool overlay_pointer(int x, int y, bool down)
                 }
             }
         }
-    } else if (!companionShown && hudHits.n > 0 && viewShown && x >= viewX && x < viewX + PK_NDS_W &&
-               y >= viewY && y < viewY + PK_NDS_H) {
-        // The HUD's own pixels take the click (and the touch screen doesn't): its hit boxes are in the top screen's
-        // coordinate space, the pointer in the picture's.
-        consumed = true;
-        if (press) {
-            const int hx = x - viewX, hy = y - viewY;
-            for (int i = 0; i < hudHits.n; ++i) {
-                const auto& at = hudHits.at[i];
-                if (hx >= at.x && hx < at.x + at.w && hy >= at.y && hy < at.y + at.h) {
-                    hudFocus = -1;
-                    hud_open_target(at.id);
-                    break;
+    } else if (!companionShown && hudHits.n > 0 && viewShown) {
+        // The HUD's own pixels take the click (and the touch screen doesn't): its hit boxes are in its own 256x192
+        // space, its picture over the four corners of its box at half size for SMALL and NORMAL (draw_hud's blend).
+        const int pct = shell.settings.hudSize == PD_HUD_LARGE ? 100 : 50;
+        const int bw = hudBoxW * pct / 100, bh = hudBoxH * pct / 100, qw = bw / 2, qh = bh / 2;
+        int hx = -1, hy = -1;
+        bool over = bw >= 2 && bh >= 2 && x >= hudBoxX && y >= hudBoxY && x < hudBoxX + hudBoxW &&
+                    y < hudBoxY + hudBoxH;
+        if (over) {
+            const int lx = x - hudBoxX, ly = y - hudBoxY;
+            if (lx < hudBoxW / 2) {
+                over = lx < qw;
+                hx = lx * (PK_NDS_W / 2) / qw;
+            } else {
+                const int ox = hudBoxW - qw;
+                over = lx >= ox;
+                hx = PK_NDS_W / 2 + (lx - ox) * (PK_NDS_W - PK_NDS_W / 2) / qw;
+            }
+            if (over) {
+                if (ly < hudBoxH / 2) {
+                    over = ly < qh;
+                    hy = ly * (PK_NDS_H / 2) / qh;
+                } else {
+                    const int oy = hudBoxH - qh;
+                    over = ly >= oy;
+                    hy = PK_NDS_H / 2 + (ly - oy) * (PK_NDS_H - PK_NDS_H / 2) / qh;
+                }
+            }
+        }
+        if (over) {
+            consumed = true;
+            if (press) {
+                for (int i = 0; i < hudHits.n; ++i) {
+                    const auto& at = hudHits.at[i];
+                    if (hx >= at.x && hx < at.x + at.w && hy >= at.y && hy < at.y + at.h) {
+                        hudFocus = -1;
+                        hud_open_target(at.id);
+                        break;
+                    }
                 }
             }
         }
@@ -854,9 +930,12 @@ bool overlay_compose(std::vector<uint32_t>& frame, int& w, int& h)
     const int gameW = w, gameH = h;
     // The overlay keeps the window's shape. The companion is drawn at the height its layout was built for (341x256, the
     // Linux DS core's), where the party grid and the tab bar fit; the quick menu has the wider 4:3 it lays its ring out
-    // in. The frontend scales either up to the window.
+    // in. The frontend scales either up to the window. The wide picture is the window's shape at every ZOOM step (the
+    // canvas grows, its aspect stays), so the overlay takes its width from it then; the stacked 256x384 screens aren't
+    // the window's shape and keep the layout's own width.
+    const bool windowShaped = (long long) gameW * 10 >= (long long) gameH * 15;
     const int baseH = companionShown ? 256 : 384;
-    const int baseW = gameH == 192 ? std::max(companionShown ? 341 : 512, (int) llround((double) baseH * gameW / gameH))
+    const int baseW = windowShaped ? std::max(companionShown ? 341 : 512, (int) llround((double) baseH * gameW / gameH))
                                    : (companionShown ? 341 : 512);
     const int outW = baseW, outH = baseH;
     std::vector<uint32_t> picture;
