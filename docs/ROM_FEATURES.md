@@ -476,7 +476,7 @@ change to any of the places listed under "Where it's decided" updates its rows h
     PC anywhere and FLY ran headless through its own script engine and flight task (landed in Pallet Town); WILD ENCOUNTERS'
     cart rates come from its map headers and encounter archive (`NdsArt.readOrigin`). Its battle engine is its own (a
     manager at 0x02255BAC, no BattleSystem): the BATTLE tab reads its battle objects (`Gen4ManagedBattle`). Its commands and
-    moves sit where HeartGold's do, so BATTLE BUTTONS press them with HeartGold's taps (`NdsBattleTaps.GEN4`): its battle
+    moves sit where HeartGold's do, so BATTLE BUTTONS press them with HeartGold's taps (`NdsBattleTaps.HEARTGOLD`): its battle
     UI's input handler is set while it waits (+0x238 -> +0x10) and another UI object (+0x234) runs the waiting panel's
     handler at +0x57C (0x02202445 the commands, 0x02202F4D the moves, 0x02202955 the bag, 0x0220270D the party;
     `readManagedBattleInput`, `battleTouch`), checked headless in a wild and a trainer battle. Not the panel's id at

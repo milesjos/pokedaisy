@@ -3448,7 +3448,7 @@ commands, 0x02202F4D the moves, 0x02202955 the bag, 0x0220270D the party (found 
 turn frame by frame, then checked in a wild and a trainer battle). Its id at +0x580 can't say which: the bag and the party
 share 3, and on the way back to the commands the id still reads the moves' 2 (then 3) for a few frames while the commands'
 handler runs. Its commands and moves sit where
-HeartGold's do, so BATTLE BUTTONS press them with `NdsBattleTaps.GEN4` from `readManagedBattleInput`'s states, and
+HeartGold's do, so BATTLE BUTTONS press them with `NdsBattleTaps.HEARTGOLD` from `readManagedBattleInput`'s states, and
 `battleTouch` gives them `PK_NDS_FIELD_TOUCH_BATTLE_MENU`; the party and anything else float the game's touch screen in, and
 SMART FF slows down while it waits. Its DEX (`POKEDEX_ORIGIN`, one national list of 1025) is written by `NdsArt.dexOrigin` from its cart:
 the text banks 791 / 803 / 711, heights / weights in `/a/0/7/4`, abilities u16 (a hidden one at 0x1A), evolutions of ten
@@ -3599,6 +3599,13 @@ headless - with the battler's nickname, the game's four buttons in its colours a
 D-pad and pulsing red corners, moves a card each on one line; the D-pad is the menu's, `PokeDaisyActivity.dsBattleTakes`, with
 the game view focused so no press goes to leaving touch mode). Steps 0 - 6 and 15 of the selection (the command init the move
 panel's CANCEL passes through, two frames with the panel drawn) are the battle buttons' own, never the floating touch screen.
+**Two screens, HeartGold / SoulSilver** (Origin HeartGold too): the companion's BAG / POKéMON open the game's bag or party on
+the DS touch screen, which `NdsBottomHost` keeps behind the companion, so while one is open (the party only where the companion has
+no switch) `PokeDaisyActivity.syncDsBattleScreen` raises the touch screen in its place (`NdsBottomHost.raiseTouch`: not saved as
+the player's pick) and gives the companion back when it closes. The companion's BACK there taps the screens' return arrow
+(`NdsBattleTaps.HEARTGOLD`'s `screenBack`, 236 / 172, both screens; headless on both carts), waiting until the screen has been
+reported up 60 frames (the party drops touches while it fades in, about 25 frames on Origin). Platinum's arrow isn't checked, so
+its BACK stays the move panel's.
 **Fades** (nds_dump's `trace` prints each screen's one-colour state): leaving a menu screen, HG fades both screens and keeps
 them black for up to ~80 frames before the X menu or the field fades in; a battle's end ~95. While both are black
 (`PK_NDS_FIELD_DARK_TOP` / `_BOTTOM`) every DS flow holds, and the first lit frame decides at once (so `TOUCH_OFF_FRAMES` is 6,

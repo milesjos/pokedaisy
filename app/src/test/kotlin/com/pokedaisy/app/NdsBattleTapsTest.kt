@@ -1,6 +1,7 @@
 package com.pokedaisy.app
 
 import com.pokedaisy.app.companion.data.BATTLE_INPUT_ACTION_SELECT
+import com.pokedaisy.app.companion.data.BATTLE_INPUT_BAG_OPEN
 import com.pokedaisy.app.companion.data.BATTLE_INPUT_BUSY
 import com.pokedaisy.app.companion.data.BATTLE_INPUT_MOVE_SELECT
 import com.pokedaisy.app.companion.data.BATTLE_INPUT_PARTY_OPEN
@@ -72,6 +73,35 @@ class NdsBattleTapsTest {
         assertEquals(listOf(30 to 172, 222 to 172, 128 to 178, 191 to 104, 230 to 175), presses())
         assertEquals(NdsBattleTaps.GEN5, NdsBattleTaps.layoutFor("IRAO"))
         assertEquals(NdsBattleTaps.GEN4, NdsBattleTaps.layoutFor("CPUE"))
+    }
+
+    // Two screens keep the bag and party behind the companion, whose BACK was their only way out and did nothing.
+    @Test
+    fun backClosesHeartGoldsBagAndPartyOnceTheyTakeATouch() {
+        taps.layout = NdsBattleTaps.layoutFor("IPKE")
+        taps.onState(BATTLE_INPUT_BAG_OPEN)
+        taps.back()
+        run(59)
+        // The screen still fading in: no touch yet.
+        assertEquals(emptyList<Pair<Int, Int>>(), presses())
+        run(10)
+        assertEquals(listOf(236 to 172), presses())
+        // Up long enough already: at once.
+        taps.onState(BATTLE_INPUT_ACTION_SELECT)
+        taps.onState(BATTLE_INPUT_PARTY_OPEN)
+        run(80)
+        taps.back(); run(6)
+        assertEquals(listOf(236 to 172, 236 to 172), presses())
+        assertEquals(NdsBattleTaps.HEARTGOLD, NdsBattleTaps.layoutFor("IPKJ"))
+    }
+
+    // Platinum's arrow isn't checked, so its BACK stays the move panel's alone.
+    @Test
+    fun platinumsBackLeavesTheBag() {
+        taps.layout = NdsBattleTaps.layoutFor("CPUE")
+        taps.onState(BATTLE_INPUT_BAG_OPEN)
+        taps.back(); run(100)
+        assertEquals(emptyList<Pair<Int, Int>>(), presses())
     }
 
     @Test
