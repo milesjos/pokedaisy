@@ -140,8 +140,8 @@ class QuickMenuState {
     /** The tiles' size as last measured (px, zero before): whether the [ring] has room on this screen ([ringFits]). */
     internal var tileSize by mutableStateOf(androidx.compose.ui.unit.IntSize.Zero)
 
-    /** The ring is what's drawn: its STYLE picked and room for it (else the grid, GitHub #1225). The stick aims only then. */
-    internal var ringShown = false
+    /** The screen has room for the [ring] as last laid out (else the grid stands in, GitHub #1225): the stick aims only then. */
+    internal var ringRoom = true
 
     /** The highlighted tile, in [items]. */
     var index by mutableIntStateOf(0)
@@ -256,7 +256,7 @@ class QuickMenuState {
      * that way, the first one at the top and on round clockwise. True = taken (a ring with tiles, no list up).
      */
     fun aim(x: Float, y: Float): Boolean {
-        if (!open || !ringShown || listing || items.isEmpty()) return false
+        if (!open || !ring || !ringRoom || listing || items.isEmpty()) return false
         if (sqrt(x * x + y * y) < AIM_DEAD) return true
         val n = items.size
         val turn = (atan2(x, -y) / (2 * PI)).toFloat().let { if (it < 0) it + 1 else it }
@@ -449,12 +449,13 @@ fun QuickMenu(state: QuickMenuState, snapshot: SnapshotView, actions: QuickActio
             val hint = current?.let { why ?: quickHint(it, actions) }
             // RING where it has room: on a small screen (a phone's short side, a split screen) its tiles would run into
             // each other, so the grid stands in (GitHub #1225).
-            val ring = state.ring && state.tileSize.let { t ->
+            val room = state.tileSize.let { t ->
                 t == androidx.compose.ui.unit.IntSize.Zero || with(LocalDensity.current) {
                     ringFits(items.size, t.width.toFloat(), t.height.toFloat(), (u * RING_GAP).toPx(), (maxWidth * RING_ROOM).toPx(), (maxHeight * RING_ROOM).toPx())
                 }
             }
-            state.ringShown = ring
+            state.ringRoom = room
+            val ring = state.ring && room
             val tile: @Composable (Int) -> Unit = { i ->
                 // UniformTiles' slots can recompose with the count they were last measured with while this lambda
                 // already sees the new, shorter list (an action no longer offered): skip the index that's gone.
