@@ -221,9 +221,23 @@ class NdsBottomHost(
 
     /** Shows the companion ([on]) or the touch screen, and tells [onSwitch] when that's a change. */
     fun show(on: Boolean) {
+        raise.playerPicked()
         if (on == showingCompanion) return
         apply(on)
         onSwitch(on)
+    }
+
+    private val raise = TouchRaise()
+
+    /** The touch screen is up for a battle's bag or party ([raiseTouch]), in the companion's place. */
+    val raisedTouch: Boolean get() = raise.raised
+
+    /** A battle's bag or party is open on the touch screen ([up]): it shows in the companion's place until it closes, then
+     * the companion comes back. True when this call put the touch screen up. */
+    fun raiseTouch(up: Boolean): Boolean {
+        val companion = raise.update(up, showingCompanion) ?: return false
+        apply(companion)
+        return !companion
     }
 
     private fun apply(on: Boolean) {
@@ -356,4 +370,28 @@ fun DsTouchPane(showCompanion: Boolean, onSwitch: (Boolean) -> Unit, companion: 
             }
         }
     }
+}
+
+/** When [NdsBottomHost] puts the touch screen up for a battle's bag or party, and gives the companion back. It isn't the
+ * player's pick, so it's never saved, and a pick of theirs meanwhile stands: it acts only when the bag / party opens or
+ * closes, never again while it stays up. */
+internal class TouchRaise {
+    /** The touch screen is up because of [update], to be given back to the companion. */
+    var raised = false
+        private set
+    private var wanted = false
+
+    /** The bag / party is [up] now: true = show the companion, false = the touch screen, null = leave it. */
+    fun update(up: Boolean, showingCompanion: Boolean): Boolean? {
+        if (up == wanted) return null
+        wanted = up
+        return when {
+            up && showingCompanion -> { raised = true; false }
+            !up && raised -> { raised = false; true }
+            else -> null
+        }
+    }
+
+    /** The player switched screens themselves: the companion isn't given back when the bag / party closes. */
+    fun playerPicked() { raised = false }
 }
