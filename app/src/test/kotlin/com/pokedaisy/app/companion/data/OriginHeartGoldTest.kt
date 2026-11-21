@@ -40,13 +40,14 @@ class OriginHeartGoldTest {
     @Test
     fun `battle input - which panel waits`() {
         val b = GEN4_ORIGIN_HEARTGOLD.managedBattle!!
-        fun state(panel: Int, handler: Long = 0x0220368D, manager: Long = 0x022C0F78): Int {
+        fun state(panel: Int, handler: Long = 0x0220368D, manager: Long = 0x022C0F78, panelFn: Long = 0x02202445): Int {
             val words = mapOf(
                 b.managerPtr to manager,
                 0x022C0F78L + b.offPanels to 0x0230CB20L,
                 0x022C0F78L + b.offBattleUi to 0x0230E4F4L,
                 0x0230E4F4L + b.offUiHandler to handler,
                 0x0230CB20L + b.offPanelId to panel.toLong(),
+                0x0230CB20L + b.offPanelFn to panelFn,
             )
             val r = object : MemoryReader {
                 override fun readCoreMemory(addr: Long, size: Int) = ByteArray(size) { i ->
@@ -58,7 +59,9 @@ class OriginHeartGoldTest {
         }
         assertEquals(BATTLE_INPUT_ACTION_SELECT, state(ORIGIN_PANEL_COMMANDS))
         assertEquals(BATTLE_INPUT_MOVE_SELECT, state(ORIGIN_PANEL_MOVES))
-        assertEquals(BATTLE_INPUT_PARTY_OPEN, state(ORIGIN_PANEL_PARTY))
+        // The bag and the party share an id: the companion's BACK and the bottom screen treat them apart.
+        assertEquals(BATTLE_INPUT_BAG_OPEN, state(ORIGIN_PANEL_SCREEN, panelFn = ORIGIN_BAG_PANEL_FN))
+        assertEquals(BATTLE_INPUT_PARTY_OPEN, state(ORIGIN_PANEL_SCREEN, panelFn = 0x0220270D))
         // The turn playing out: no handler.
         assertEquals(BATTLE_INPUT_BUSY, state(ORIGIN_PANEL_COMMANDS, handler = 0))
         // Out of a battle the manager pointer is cleared.

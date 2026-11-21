@@ -221,9 +221,11 @@ data class Gen4ManagedBattle(
     /** The touch screen's controller (manager +0x238): its +0x10 input handler is set while the battle waits for a tap. */
     val offBattleUi: Int = 0x238,
     val offUiHandler: Int = 0x10,
-    /** Another of its UI objects (manager +0x234): +0x580 says which panel waits ([readManagedBattleInput]). */
+    /** Another of its UI objects (manager +0x234): +0x580 says which panel waits, +0x57C is that panel's handler
+     * ([readManagedBattleInput]). */
     val offPanels: Int = 0x234,
     val offPanelId: Int = 0x580,
+    val offPanelFn: Int = 0x57C,
 )
 
 /** One of FLY's spots: the town's map header and the tile FLY lands on (its x / z, as GetSpawnIdByMapAndCoords finds it).
@@ -728,8 +730,9 @@ fun readGen4BattleInput(r: MemoryReader, b: Gen4Battle): Int {
 
 /**
  * Origin HeartGold's battle panels as [readGen4BattleInput]'s states: while the touch controller's handler is set, the
- * panel object's id is 5 at the commands, 2 at the moves, 3 at the party (headless, a wild and a trainer battle). On the
- * way back to the commands after a turn the id reads 2 for under 15 frames; the battle buttons' presses re-read the state.
+ * panel object's id is 5 at the commands, 2 at the moves, 3 at the bag or the party, which its handler tells apart
+ * (headless, a wild and a trainer battle). On the way back to the commands after a turn the id reads 2 for under 15
+ * frames; the battle buttons' presses re-read the state.
  */
 fun readManagedBattleInput(r: MemoryReader, b: Gen4ManagedBattle): Int {
     val mgr = u32(r.readCoreMemory(b.managerPtr, 4), 0)
@@ -739,18 +742,22 @@ fun readManagedBattleInput(r: MemoryReader, b: Gen4ManagedBattle): Int {
     val ui = u32(head, b.offBattleUi - b.offPanels)
     if (!inMain(ui) || !inMain(panels)) return BATTLE_INPUT_BUSY
     if (u32(r.readCoreMemory(ui + b.offUiHandler, 4), 0) == 0L) return BATTLE_INPUT_BUSY
-    return when (u32(r.readCoreMemory(panels + b.offPanelId, 4), 0).toInt()) {
+    val panel = r.readCoreMemory(panels + b.offPanelFn, 8)
+    return when (u32(panel, b.offPanelId - b.offPanelFn).toInt()) {
         ORIGIN_PANEL_COMMANDS -> BATTLE_INPUT_ACTION_SELECT
         ORIGIN_PANEL_MOVES -> BATTLE_INPUT_MOVE_SELECT
-        ORIGIN_PANEL_PARTY -> BATTLE_INPUT_PARTY_OPEN
+        ORIGIN_PANEL_SCREEN -> if (u32(panel, 0) == ORIGIN_BAG_PANEL_FN) BATTLE_INPUT_BAG_OPEN else BATTLE_INPUT_PARTY_OPEN
         else -> BATTLE_INPUT_BUSY
     }
 }
 
 /** Origin HeartGold's panel ids ([readManagedBattleInput]); pk_nds_field.cpp's battleTouch reads the same. */
 const val ORIGIN_PANEL_MOVES = 2
-const val ORIGIN_PANEL_PARTY = 3
+const val ORIGIN_PANEL_SCREEN = 3
 const val ORIGIN_PANEL_COMMANDS = 5
+
+/** The bag's panel handler in Origin v4.0.3 (the party's is 0x0220270D). */
+const val ORIGIN_BAG_PANEL_FN = 0x02202955L
 
 /**
  * POKéMON on a DS battle's touch screen: where its party screen shows the Pokémon with [personality] (0 top left, 1 top
