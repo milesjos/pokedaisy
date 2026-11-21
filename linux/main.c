@@ -327,6 +327,11 @@ static struct pd_touch_panel panelMsg;
 static bool panelPending, panelActive;
 static SDL_Texture *panelTexture;
 static int panelTexW, panelTexH;
+/* A core's field HUD at its own resolution, drawn over its box at the window's pixels (a ZOOM step scales the canvas). */
+static struct pd_hud hudMsg;
+static bool hudPending, hudActive, hudHave; // hudHave: this frame sent one (a frame shown again keeps the last)
+static SDL_Texture *hudTexture;
+static int hudTexW, hudTexH;
 static int pointerX, pointerY;
 static bool pointerDown;
 static void script_mouse(void);
@@ -1061,6 +1066,14 @@ static bool environment(unsigned cmd, void *data) {
       panelMsg = *p;
     return true;
   }
+  case PD_ENV_SET_HUD: {
+    const struct pd_hud *h = data;
+    hudPending = h && h->active && h->pixels && h->src_w > 0 && h->src_h > 0 && h->w > 0 && h->h > 0;
+    hudHave = true;
+    if (hudPending)
+      hudMsg = *h;
+    return true;
+  }
   case RETRO_ENVIRONMENT_GET_THROTTLE_STATE: {
     struct retro_throttle_state *t = data;
     t->mode = rewindingNow ? RETRO_THROTTLE_REWINDING
@@ -1078,6 +1091,9 @@ static bool environment(unsigned cmd, void *data) {
 static void video_refresh(const void *data, unsigned w, unsigned h, size_t pitch) {
   panelActive = panelPending;
   panelPending = false;
+  if (hudHave) // a frame the core only repeats keeps the HUD where it was
+    hudActive = hudPending;
+  hudPending = hudHave = false;
   if (!data || !frameTexture) // a dupe: the last frame stays
     return;
   SDL_Rect r = {0, 0, (int)w, (int)h};
@@ -1227,6 +1243,44 @@ static void present_game(const struct pd_menu *menu) {
       SDL_FRect dst = {(float)frameRect.x + panelMsg.x * sx, (float)frameRect.y + panelMsg.y * sy,
                        panelMsg.w * sx, panelMsg.h * sy};
       SDL_RenderCopyF(renderer, panelTexture, NULL, &dst);
+    }
+  }
+  // The core's field HUD, from its own 256 x 192 picture: the frame's canvas is scaled to the window, and at a ZOOM step a
+  // HUD blended into the canvas would be resampled with the picture. Drawn here it keeps the window's pixels at every step.
+  if (hudActive && hudMsg.pixels && hudMsg.src_w > 0 && hudMsg.src_h > 0 && frameW > 0 && frameH > 0) {
+    if (!hudTexture || hudTexW != hudMsg.src_w || hudTexH != hudMsg.src_h) {
+      if (hudTexture)
+        SDL_DestroyTexture(hudTexture);
+      hudTexture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, hudMsg.src_w,
+                                     hudMsg.src_h);
+      hudTexW = hudMsg.src_w;
+      hudTexH = hudMsg.src_h;
+      if (hudTexture) {
+        SDL_SetTextureBlendMode(hudTexture, SDL_BLENDMODE_BLEND);
+        SDL_SetTextureScaleMode(hudTexture, SDL_ScaleModeNearest);
+      }
+    }
+    if (hudTexture) {
+      SDL_UpdateTexture(hudTexture, NULL, hudMsg.pixels, hudMsg.src_w * 4);
+      const float sx = (float)frameRect.w / (float)frameW, sy = (float)frameRect.h / (float)frameH;
+      const float bx = (float)frameRect.x + hudMsg.x * sx, by = (float)frameRect.y + hudMsg.y * sy;
+      const float bw = hudMsg.w * sx, bh = hudMsg.h * sy;
+      // SMALL / NORMAL: each quarter of the picture at its own corner of the box, a quarter of the box's size, as the core's
+      // in-canvas blend places it. Drawn from the picture's own pixels in one go, a quarter is as sharp here as at 2x.
+      if (hudMsg.pct >= 100) {
+        SDL_FRect dst = {bx, by, bw, bh};
+        SDL_RenderCopyF(renderer, hudTexture, NULL, &dst);
+      } else {
+        const float qw = bw * hudMsg.pct / 200.0f, qh = bh * hudMsg.pct / 200.0f;
+        const float sw = (float)hudMsg.src_w / 2, sh = (float)hudMsg.src_h / 2;
+        if (qw >= 1 && qh >= 1)
+          for (int qy = 0; qy < 2; qy++)
+            for (int qx = 0; qx < 2; qx++) {
+              SDL_Rect src = {(int)(qx * sw), (int)(qy * sh), (int)sw, (int)sh};
+              SDL_FRect dst = {qx ? bx + bw - qw : bx, qy ? by + bh - qh : by, qw, qh};
+              SDL_RenderCopyF(renderer, hudTexture, &src, &dst);
+            }
+      }
     }
   }
   render_lcd();

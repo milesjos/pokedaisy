@@ -18,6 +18,7 @@
 #include "pd_binput.h"
 #include "polished_action_data.h"
 #include "hud.h"
+#include "pd_env.h"
 #include "pd_guide.h"
 #include "pd_tr.h"
 #include "pk_call.h"
@@ -762,6 +763,10 @@ static int frames;
 static struct hud_state hudState = {.wild = -1, .focus = -1};
 static struct hud_hits hudHits;
 static bool hudFocus, hudShown;
+/* The frontend draws the field HUD itself (PD_ENV_SET_HUD): a ZOOM step's canvas is scaled to the window, and a HUD
+ * blended into it would be resampled with the picture, soft at 1x and sharp only at 2x. */
+static bool hudHost, hudNativeOn;
+static int hudNativePct; // SIZE the picture goes over the box for: 100 the whole box, 50 its four corners
 static uint32_t *hudPixels;
 static uint32_t *hudSpreadPx; // the HUD's 1x layout spread over a ZOOM canvas, blended 1:1 (draw_hud)
 static uint32_t hudDrawnKey;
@@ -928,6 +933,7 @@ static void canvas_for(int fw, int fh, int kind, int extra, int *w, int *h);
 /* The HUD over the game's own picture, a canvas pixel a game pixel: SIZE picks the mini HUD (SMALL, NORMAL) or the full
  * one (LARGE). */
 static void draw_hud(void) {
+  hudNativeOn = false;
   int gs = game_scale(gameW, gameH);
   int ax = (CW - (int)gameW * gs) / 2, ay = (CH - (int)gameH * gs) / 2, aw = (int)gameW * gs, ah = (int)gameH * gs;
   bool base = false; // a ZOOM step: the HUD keeps the 1x picture's layout, so the frontend's smaller scale leaves it the same
@@ -973,7 +979,11 @@ static void draw_hud(void) {
     hudTH = CH;
     hudPct = small ? 50 : 100;
     hudScale = 1;
-    if (hudShown) {
+    // A frontend that draws it takes the picture at its own size instead: the same quarters, each drawn once to the
+    // window, so SMALL and NORMAL are as sharp at 1x as they are at 2x (the spread below halves them at 1x).
+    hudNativeOn = hudShown;
+    hudNativePct = hudPct;
+    if (hudShown && !hudHost) {
       hud_quarters(hudPixels, w, hh, hudSpreadPx, CW, CH, hudPct);
       blend_overlay(hudSpreadPx, CW, CH, 1, 0, 0);
     }
@@ -1418,6 +1428,11 @@ RETRO_API bool retro_load_game(const struct retro_game_info *g) {
   choose_canvas();
   read_options();
   {
+    struct pd_hud probe;
+    memset(&probe, 0, sizeof probe);
+    hudHost = realEnv && realEnv(PD_ENV_SET_HUD, &probe);
+  }
+  {
     struct retro_audio_buffer_status_callback abc = {audio_status_both};
     realEnv(RETRO_ENVIRONMENT_SET_AUDIO_BUFFER_STATUS_CALLBACK, &abc);
   }
@@ -1646,6 +1661,12 @@ RETRO_API void retro_unload_game(void) {
   wideSupported = wideReady = false;
   quickOpen = flyList = repelList = false;
   PD_BE_BEFORE_UNLOAD();
+  if (hudHost && realEnv) { // the picture goes with hudPixels
+    struct pd_hud off;
+    memset(&off, 0, sizeof off);
+    realEnv(PD_ENV_SET_HUD, &off);
+    hudHost = false;
+  }
   mgba_retro_unload_game();
   free(cvs);
   free(out565);
@@ -2539,6 +2560,7 @@ RETRO_API void retro_run(void) {
     return;
   }
   PF_T(td0);
+  hudNativeOn = false; // the companion or the quick menu has the picture, not the HUD
   if (companion) {
     pd_ui_update(&ui, &snap);
     ui.focusId = focusId;
@@ -2615,6 +2637,22 @@ RETRO_API void retro_run(void) {
   }
   PF_T(td1);
   pf_add(PF_DRAW, td1 - td0);
+  // The HUD at the frontend's own pixels, for one that draws it (PD_ENV_SET_HUD). A frame it shows again sends nothing,
+  // so the HUD stays as it was with the picture.
+  if (hudHost && realEnv) {
+    struct pd_hud hud;
+    memset(&hud, 0, sizeof hud);
+    if (hudNativeOn) {
+      hud.pixels = hudPixels;
+      hud.src_w = hudW;
+      hud.src_h = hudH;
+      hud.w = CW;
+      hud.h = CH;
+      hud.pct = hudNativePct;
+      hud.active = 1;
+    }
+    realEnv(PD_ENV_SET_HUD, &hud);
+  }
   present();
   haveGameFrame = !companion && !quickOpen && !hudFocus;
   PF_T(td2);

@@ -4,6 +4,8 @@
 // and all; the overlay takes the picture and the pad until it closes.
 #pragma once
 
+#include "pd_env.h"
+
 #include <cstdint>
 #include <vector>
 
@@ -32,6 +34,12 @@ int overlay_zoom();
 void overlay_view(int topX, int topY, bool topShown);
 // The HUD's 256x192 picture's box in the picture (the 1x top screen, scaled with the window): compose_layout.
 void overlay_hud_box(int x, int y, int w, int h);
+// A host that draws the HUD itself (PD_ENV_SET_HUD): draw_hud keeps it out of the frame then, and overlay_hud_native hands
+// it the picture at its own resolution, so a ZOOM step's canvas scaling never resamples it.
+void overlay_hud_host(bool host);
+// This frame's HUD for that host: its 256x192 picture (SMALL and NORMAL at half, in the box's corners) and the box. False
+// when no HUD is on the picture, and the core withdraws it.
+bool overlay_hud_native(struct pd_hud* msg);
 // A pointer press on the picture (the overlay's own size while it shows, canvas pixels): true when the companion, the
 // HUD or the quick menu takes it, so the game's touch screen doesn't. A click on a HUD part runs it; on a quick menu
 // tile, runs the tile; on the companion, its tab, row, button or gear.

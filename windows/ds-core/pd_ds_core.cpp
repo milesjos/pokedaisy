@@ -67,6 +67,7 @@ bool touchView = false;
 bool padCombo = false;
 bool wideEnabled = false;
 bool haveFrame = false;
+bool hudHost = false;   // the frontend draws the field HUD itself (PD_ENV_SET_HUD), at the window's pixels
 int presentedW = PK_NDS_W, presentedH = PK_NDS_H * 2;   // the frame the frontend has (the overlay's size while it shows)
 std::vector<uint32_t> canvas;   // the frame as it goes out (XRGB8888)
 std::vector<uint32_t> scratch;  // a wide view asked for while the camera may have stopped
@@ -360,6 +361,13 @@ void compose()
     int outW = layout.w, outH = layout.h;
     overlay_view(layout.x, layout.y, layout.mode != Layout::Touch);
     overlay_compose(canvas, outW, outH);
+    // The HUD at the window's own pixels, for a host that draws it: the canvas above is scaled to the window, and at a
+    // ZOOM step (1.25x, 1.5x) a HUD blended into it would be resampled with the picture.
+    if (hudHost && env_cb) {
+        pd_hud hud {};
+        overlay_hud_native(&hud);
+        env_cb(PD_ENV_SET_HUD, &hud);
+    }
     presentedW = outW;
     presentedH = outH;
     video_cb(canvas.data(), outW, outH, outW * (int) sizeof(uint32_t));
@@ -718,6 +726,11 @@ RETRO_API bool retro_load_game(const struct retro_game_info* game)
     if (!pk_ndsm_init(game->path, savePath.c_str(), SAMPLE_RATE)) return false;
     // The host loads the .sav into the save memory it reads here; the engine has read the same file at boot.
     overlay_load(game->path, saveDir.c_str());
+    // Whether this frontend draws the HUD itself: it takes the HUD's own 256x192 picture (PD_ENV_SET_HUD) and scales it
+    // to the window, so a ZOOM step's smaller canvas doesn't soften it.
+    pd_hud probe {};
+    hudHost = env_cb && env_cb(PD_ENV_SET_HUD, &probe);
+    overlay_hud_host(hudHost);
     quickFf = false;
     if (env_cb) env_cb(PD_ENV_SET_FAST_FORWARD, &quickFf);
     compose_layout();
@@ -727,6 +740,10 @@ RETRO_API bool retro_load_game(const struct retro_game_info* game)
 RETRO_API void retro_unload_game(void)
 {
     overlay_reset();
+    if (hudHost && env_cb) { // the HUD's picture goes with the overlay's buffers
+        pd_hud off {};
+        env_cb(PD_ENV_SET_HUD, &off);
+    }
     quickFf = false;
     pk_ndsm_flush_save();
     pk_ndsm_deinit();

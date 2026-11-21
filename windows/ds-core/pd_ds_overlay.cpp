@@ -75,6 +75,10 @@ int viewX = 0, viewY = 0;                  // the top screen's corner in the gam
 // The HUD's 256x192 picture's box in the picture: the 1x top screen's place and size on screen, so a ZOOM step's
 // smaller scale leaves it where it was and SIZE's smaller HUD stays its corners (draw_hud blends it there).
 int hudBoxX = 0, hudBoxY = 0, hudBoxW = PK_NDS_W, hudBoxH = PK_NDS_H;
+std::vector<uint32_t> hudNative;           // the HUD at the window's pixels, for a host that draws it (overlay_hud_native)
+bool hudNativeOn = false;                  // this frame's HUD is over the picture
+bool hudHost = false;                      // the host draws it (PD_ENV_SET_HUD): draw_hud keeps it out of the frame
+int hudNativePct = 0;                      // SIZE the picture was last handed over for (100 the box, 50 its corners)
 bool viewShown = false;                    // the top screen is the one in the picture
 bool pointerDown = false;                  // last frame's mouse / touch press, for a click on the HUD or the menu
 int frameFieldBits = 0;                    // this frame's field read, for the core's battle-wide picture
@@ -527,11 +531,26 @@ void hud_open_target(int target)
     }
 }
 
+// The HUD's own 256x192 picture as the host takes it (PD_ENV_SET_HUD): ARGB, alpha 0 clear, the 24-bit colours the HUD
+// draws opaque. The host places its quarters itself, so SMALL and NORMAL keep the picture's own pixels at the box's
+// corners (a quarter of it) rather than a half-size copy resampled here.
+void hud_native_copy(void)
+{
+    hudNative.assign((size_t) PK_NDS_W * PK_NDS_H, 0);
+    for (size_t i = 0; i < hudNative.size(); ++i) {
+        const uint32_t p = hudPixels[i];
+        if (p == QUICK_CLEAR) continue;
+        const unsigned a = (p >> 24) ? (p >> 24) : 255;
+        hudNative[i] = (a << 24) | (p & 0xFFFFFFu);
+    }
+}
+
 // The DS HUD over the field: the party row, the minimap, the Poké Balls and Repel steps left, and the PC / BAG / WILD /
 // COMPANION buttons, drawn at 256x192 and blended over the top screen's pixels in the picture (viewX / viewY). The scene
 // policy keeps it to a calm, lit overworld, and the settings say whether it shows at all.
 void draw_hud(std::vector<uint32_t>& frame, int w, int h)
 {
+    hudNativeOn = false;
     if (!viewShown || !shell.settings.hud || companionGame == DsGame::Unsupported || !scene.hud || scene.dark ||
         !field_free() || viewX < 0 || viewY < 0 || viewX + PK_NDS_W > w || viewY + PK_NDS_H > h) {
         hudHits.n = 0;
@@ -637,7 +656,14 @@ void draw_hud(std::vector<uint32_t>& frame, int w, int h)
     // of the picture pixels it covers. The boxes are clipped to the picture.
     const int pct = shell.settings.hudSize == PD_HUD_LARGE ? 100 : 50;
     const int bw = hudBoxW * pct / 100, bh = hudBoxH * pct / 100;
-    if (bw >= 2 && bh >= 2)
+    // A host that draws the HUD takes it at its own resolution instead (overlay_hud_native); the blend below is the same
+    // picture for every other frontend.
+    hudNativeOn = bw >= 2 && bh >= 2;
+    if (hudNativeOn) {
+        hud_native_copy();
+        hudNativePct = pct;
+    }
+    if (hudNativeOn && !hudHost)
         for (int qy = 0; qy < 2; ++qy)
             for (int qx = 0; qx < 2; ++qx) {
                 const int sx0 = PK_NDS_W * qx / 2, sxe = PK_NDS_W * (qx + 1) / 2;
@@ -689,6 +715,23 @@ void overlay_hud_box(int x, int y, int w, int h)
     hudBoxY = y;
     hudBoxW = w < 1 ? 1 : w;
     hudBoxH = h < 1 ? 1 : h;
+}
+void overlay_hud_host(bool host) { hudHost = host; }
+bool overlay_hud_native(struct pd_hud* msg)
+{
+    if (!msg) return false;
+    std::memset(msg, 0, sizeof *msg);
+    if (!hudNativeOn || hudNative.empty()) return false;
+    msg->pixels = hudNative.data();
+    msg->src_w = PK_NDS_W;
+    msg->src_h = PK_NDS_H;
+    msg->x = hudBoxX;
+    msg->y = hudBoxY;
+    msg->w = hudBoxW;
+    msg->h = hudBoxH;
+    msg->pct = hudNativePct;
+    msg->active = 1;
+    return true;
 }
 bool overlay_wide() { return shell.settings.aspect != PD_ASPECT_ORIGINAL; }
 int overlay_zoom() {
@@ -927,6 +970,7 @@ bool overlay_compose(std::vector<uint32_t>& frame, int& w, int& h)
         if (noticeFrames) draw_notice(frame.data(), w, h);
         return false;
     }
+    hudNativeOn = false; // the companion or the quick menu has the picture, not the HUD
     const int gameW = w, gameH = h;
     // The overlay keeps the window's shape. The companion is drawn at the height its layout was built for (341x256, the
     // Linux DS core's), where the party grid and the tab bar fit; the quick menu has the wider 4:3 it lays its ring out

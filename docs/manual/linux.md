@@ -182,13 +182,15 @@ smaller picture, centred.
 
 `ZOOM` steps the view out the way the app's `ZOOM` hotkey does: `1x`, then each whole scale the window and the core's
 canvas allow (`1.3x`, `2x` on a 720p window). The game stays at its own pixels and the map reaches the edges at
-every step, so a step shows more of the route around you with the game a little smaller. `AUTO ZOOM IN` sits right
-under it, `ON` by default: battles, conversations, text boxes and menus ease back in to `1x`, and the field eases back
-out to your step. Each game keeps its own, and a window too small for a step doesn't offer it.
+every step, so a step shows more of the route around you with the game a little smaller. The HUD is drawn from its own
+pixels at every step, not resampled with the picture, so it stays as sharp at `1x` as it is at `2x`. `AUTO ZOOM IN`
+sits right under it, `ON` by default: battles, conversations, text boxes and menus ease back in to `1x`, and the
+field eases back out to your step. Each game keeps its own, and a window too small for a step doesn't offer it.
 
 DS games get the same on the Windows build, drawn by the app's own melonDS engine: the screen sits in the middle of the
 window and the overworld is drawn out to the edges. Battles stay wide too. `ZOOM` steps the whole wide picture out by
-`1.25x`, `1.5x` and `2x` there, so both screens, the HUD and the touch window keep their places. A text box or a sign
+`1.25x`, `1.5x` and `2x` there, so both screens, the HUD and the touch window keep their places. The HUD is drawn after
+the picture is scaled to the window, so it stays as sharp at `1.25x` and `1.5x` as it is at `2x`. A text box or a sign
 on the field keeps that step; only the DS games' battles and menu screens ease back in. When the game asks for
 its touch screen, in a menu or in a battle's commands, bag or party, it floats over the wide picture in a framed window
 like the app's `ONE SCREEN`: click or tap inside it to use it, and the game keeps running behind it. Outside a battle the

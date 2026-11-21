@@ -18,4 +18,18 @@ struct pd_touch_panel {
   int active;
 };
 
+/* The core's field HUD at its own resolution. A ZOOM step grows the core's canvas and the frontend scales it down to
+ * the window, so a HUD blended into the picture is resampled with it: sharp at whole steps, soft at 1.25x and 1.5x. A
+ * host that can draw it takes the HUD's own picture instead, drawn over its box in the window's pixels, so each HUD
+ * pixel reaches the window from the picture once. [data] is a pd_hud; the pixels stay valid until the core's next
+ * frame. active = 0 withdraws it. */
+#define PD_ENV_SET_HUD 0x20003
+struct pd_hud {
+  const uint32_t *pixels; /* src_w x src_h, the HUD's own 256x192, ARGB8888, alpha 0 = clear */
+  int src_w, src_h;
+  int x, y, w, h;         /* the HUD's box in the core's canvas (the 1x top screen's place at every ZOOM step) */
+  int pct;                /* 100: the picture over the whole box. 50: each quarter at its own corner, a quarter of the box */
+  int active;
+};
+
 #endif
