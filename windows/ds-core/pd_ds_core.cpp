@@ -14,6 +14,9 @@
 #include "pk_nds_cores.h"
 #include "pk_nds_field.h"
 #include "pd_env.h"
+extern "C" {
+#include "pd_fs.h" // pd_save_path: the host's own rule for which .sav is this game's
+}
 
 #include <algorithm>
 #include <cmath>
@@ -97,13 +100,6 @@ std::string file_name(const std::string& path)
     return slash == std::string::npos ? path : path.substr(slash + 1);
 }
 
-bool file_exists(const std::string& path)
-{
-    FILE* f = std::fopen(path.c_str(), "rb");
-    if (f) std::fclose(f);
-    return f != nullptr;
-}
-
 void read_options()
 {
     std::string value;
@@ -135,12 +131,13 @@ void compose_layout()
         // EXPAND extends the field sideways, not above and below the screen: at 1x the canvas is exactly the window's
         // shape, the screen's height, so every margin is one the 3D fills. A ZOOM step (the companion's SETTINGS, the
         // app's SCREEN group) grows the canvas by 1.25x, 1.5x or 2x: the field keeps filling it and the frontend shows
-        // it at the next whole scale, which is more of the map with the game smaller. A field text box reads as the
-        // field, so the step stays through signs and conversations; everything else (a battle, a menu, a fade, a title)
-        // steps in to 1x whatever AUTO ZOOM IN says. Past the renderer's widest margins the step falls back.
+        // it at the next whole scale, which is more of the map with the game smaller. As in the app, a field text box steps
+        // in only with AUTO ZOOM IN on; everything else (a battle, a menu, a fade, a title) always steps in to 1x. Past
+        // the renderer's widest margins the step falls back.
         static const int zooms[4][2] = {{4, 4}, {5, 4}, {6, 4}, {8, 4}};
         int level = overlay_zoom();
-        if (pk_ndsm_wide_scene() != 0) level = 0;
+        const int scene = pk_ndsm_wide_scene();
+        if (scene != 0 && !(scene == 1 && !overlay_auto_zoom())) level = 0;
         const int baseW = std::max(PK_NDS_W, (int) llround((double) PK_NDS_H * panelW / panelH));
         for (; level > 0; --level) {
             const int w = std::max(PK_NDS_W, (int) llround((double) baseW * zooms[level][0] / zooms[level][1]));
@@ -466,12 +463,6 @@ uint32_t read_keys()
     return keys;
 }
 
-std::string stateFile()
-{
-    const std::string dir = saveDir.empty() ? std::string(".") : saveDir;
-    return dir + "/pokedaisy-ds.state";
-}
-
 // The frontend's state slot for this ROM (the host's states/<ROM>.ss), shared by the quick menu and the host hotkey.
 std::string quickStateFile()
 {
@@ -502,15 +493,6 @@ bool read_file(const std::string& path, std::vector<uint8_t>& out)
     return ok;
 }
 
-bool write_file(const std::string& path, const void* data, size_t len)
-{
-    FILE* f = fopen(path.c_str(), "wb");
-    if (!f) return false;
-    const bool ok = !len || fwrite(data, 1, len, f) == len;
-    fclose(f);
-    return ok;
-}
-
 } // namespace
 
 bool overlay_state_exists()
@@ -528,8 +510,10 @@ bool overlay_state_load()
     if (!pk_ndsm_active() || romPath.empty()) return false;
     const std::string path = quickStateFile();
     if (!state_exists(path)) return false;
+    std::vector<uint8_t> bytes;
+    if (!read_file(path, bytes)) return false;
     overlay_reset();
-    return pk_ndsm_load_state(path.c_str());
+    return pk_ndsm_load_state_mem_keeping_save(bytes.data(), bytes.size());   // the battery save stays (retro_unserialize)
 }
 
 bool overlay_fast_forward() { return quickFf; }
@@ -642,48 +626,31 @@ RETRO_API size_t retro_serialize_size(void)
 {
     if (!pk_ndsm_active()) return 0;
     // melonDS's states are variable length (they grow as sections are written), so the size a frontend allocates comes
-    // from one taken once: the same game's stays the same.
+    // from one taken once, with room to grow: the same game's stays about the same.
     if (!stateSize) {
-        const std::string path = stateFile();
-        if (pk_ndsm_save_state(path.c_str())) {
-            FILE* f = fopen(path.c_str(), "rb");
-            if (f) {
-                fseek(f, 0, SEEK_END);
-                const long n = ftell(f);
-                fclose(f);
-                if (n > 0 && (size_t) n <= STATE_MAX) stateSize = (size_t) n;
-            }
-            remove(path.c_str());
-        }
+        const size_t n = pk_ndsm_state_mem(nullptr, 0);
+        if (n) stateSize = std::min(STATE_MAX, n + (n >> 4));
     }
     return stateSize ? stateSize : STATE_MAX;
 }
 
+// In memory, never through a file: the host's REWIND takes one every other frame.
 RETRO_API bool retro_serialize(void* data, size_t size)
 {
-    if (!pk_ndsm_active() || !size || size > STATE_MAX) return false;
-    const std::string path = stateFile();
-    if (!pk_ndsm_save_state(path.c_str())) return false;
-    std::vector<uint8_t> bytes;
-    if (!read_file(path, bytes) || bytes.size() > size) {
-        remove(path.c_str());
-        return false;
-    }
-    remove(path.c_str());
-    memcpy(data, bytes.data(), bytes.size());
-    memset((uint8_t*) data + bytes.size(), 0, size - bytes.size());
+    if (!pk_ndsm_active() || !data || !size) return false;
+    const size_t n = pk_ndsm_state_mem(static_cast<uint8_t*>(data), size);
+    if (!n) return false;
+    memset(static_cast<uint8_t*>(data) + n, 0, size - n);   // melonDS reads its own length; the padding is never read
     return true;
 }
 
+// The frontend owns the battery save (RETRO_MEMORY_SAVE_RAM, its .sav and its backups): a state never puts its own,
+// maybe older, copy over it - as the Linux DS core and the GB / GBA cores keep it.
 RETRO_API bool retro_unserialize(const void* data, size_t size)
 {
     if (!pk_ndsm_active() || !data || size > STATE_MAX) return false;
-    const std::string path = stateFile();
-    if (!write_file(path, data, size)) return false;
     overlay_reset();
-    const bool ok = pk_ndsm_load_state(path.c_str());
-    remove(path.c_str());
-    return ok;
+    return pk_ndsm_load_state_mem_keeping_save(static_cast<const uint8_t*>(data), size);
 }
 
 RETRO_API void* retro_get_memory_data(unsigned id)
@@ -703,15 +670,12 @@ RETRO_API bool retro_load_game(const struct retro_game_info* game)
     const char* dir = nullptr;
     if (env_cb && env_cb(RETRO_ENVIRONMENT_GET_SAVE_DIRECTORY, &dir) && dir) saveDir = dir;
     romPath = game->path;
-    const std::string saveRoot = saveDir.empty() ? std::string(".") : saveDir, romName = file_name(game->path);
-    savePath = saveRoot + "/" + romName + ".sav";
-    // A save named after the ROM without its extension (another emulator's: pokeblack2.nds -> pokeblack2.sav) is this
-    // game's save too, and the host names the file it backs up and reads the same way.
-    if (!file_exists(savePath)) {
-        const size_t dot = romName.rfind('.');
-        const std::string alt = dot != std::string::npos && dot ? saveRoot + "/" + romName.substr(0, dot) + ".sav" : std::string();
-        if (!alt.empty() && file_exists(alt)) savePath = alt;
-    }
+    const std::string saveRoot = saveDir.empty() ? std::string(".") : saveDir;
+    // The host's rule (linux/pd_fs.h), so both name the same file: <rom>.sav, or another emulator's <base>.sav when no
+    // other ROM beside this one has that base name.
+    char sav[4096];
+    pd_save_path(saveRoot.c_str(), game->path, sav, sizeof sav);
+    savePath = sav;
 
     retro_pixel_format format = RETRO_PIXEL_FORMAT_XRGB8888;
     if (env_cb) env_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &format);
@@ -745,7 +709,9 @@ RETRO_API void retro_unload_game(void)
         env_cb(PD_ENV_SET_HUD, &off);
     }
     quickFf = false;
-    pk_ndsm_flush_save();
+    // A save the game is still writing ("SAVING...") finishes first, as the app does before it stops a DS game: else
+    // the newer slot is left half written.
+    pk_ndsm_finish_save(600);
     pk_ndsm_deinit();
     haveFrame = false;
     romPath.clear();

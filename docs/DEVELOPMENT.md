@@ -2138,9 +2138,6 @@ only keeps a 256x256 ring of tiles in VRAM (`field_camera.c`), so the rest would
   its margins are the menu's back layer); a battle's start, a battle and the title still pull in - and so does a menu
   screen opened from a battle (POKéMON / BAG: `gMain.inBattle` stays set, so pk_wide.c reports it as the battle,
   `PK_WIDE_SCENE_OFF`, not `_MENU` - the party screen used to zoom out mid-battle and the battle zoom back in after it).
-  The DS cores report a text box on the field as the field (`pk_ndsm_wide_scene`, `pk_ndsb_wide_scene`,
-  `pk_ndsd_wide_scene`), so DS signs and conversations keep the chosen zoom; their menus and battles still report 6
-  and 4.
 - **Leaving a building holds the zoom** (`textUp`, `POPUP_ROWS` / `POPUP_COLS`): the game locks the controls for the
   walk out of the door while the map-name popup is up (even Pallet Town's after the player's house), which read as a
   text box for ~80 frames - a pull-in and a zoom back out at every door. The popup's corner of BG0 (the top-left 14 x

@@ -470,6 +470,14 @@ static void events(void) {
         libraryClick = true;
       }
     }
+#ifndef _WIN32
+    // The cursor shows while a real mouse is used (not a touch screen's mouse events) and goes at the next key / button.
+    if ((e.type == SDL_MOUSEMOTION && e.motion.which != SDL_TOUCH_MOUSEID) ||
+        ((e.type == SDL_MOUSEBUTTONDOWN) && e.button.which != SDL_TOUCH_MOUSEID))
+      SDL_ShowCursor(SDL_ENABLE);
+    else if (e.type == SDL_KEYDOWN || e.type == SDL_CONTROLLERBUTTONDOWN || e.type == SDL_JOYBUTTONDOWN)
+      SDL_ShowCursor(SDL_DISABLE);
+#endif
     if (e.type == SDL_MOUSEMOTION) {
       mouseWindowX = e.motion.x, mouseWindowY = e.motion.y;
       pointer_at(e.motion.x, e.motion.y);
@@ -1805,7 +1813,7 @@ static void run_game(const char *path, int maxFrames, const char *shot, bool fro
     snprintf(sav, sizeof sav, "%s", saveFile);
     snprintf(backups, sizeof backups, "%s/backups", root);
   } else {
-    pd_save_path(savesDir, name, sav, sizeof sav);
+    pd_save_path(savesDir, path, sav, sizeof sav);
     snprintf(backups, sizeof backups, "%s/pokedaisy-backups", savesDir);
   }
   // DS uses L2 for the Companion and R2 for screen switching. Keep the host's DS bindings separate.
@@ -2050,6 +2058,11 @@ static void run_game(const char *path, int maxFrames, const char *shot, bool fro
       }
     } else if (menuOpen && kbCapture >= 0) {
       // The key that went down is the row's (taken from any other row that had it); B cancels, SELECT = off.
+      // On a keyboard, Escape cancels and Backspace turns the row off (else they were bound, Escape taking MENU's key).
+      if (lastKey == SDLK_ESCAPE)
+        lastKey = 0, pressed |= 1u << B;
+      else if (lastKey == SDLK_BACKSPACE || lastKey == SDLK_DELETE)
+        lastKey = 0, pressed |= 1u << SELECT;
       if (lastKey) {
         for (int i = 0; i < KB_COUNT; i++)
           if (kbKeys[i] == lastKey)
@@ -2078,7 +2091,7 @@ static void run_game(const char *path, int maxFrames, const char *shot, bool fro
         kbCapture = kbMenu.selected;
         held = pressed = 0; // the keys it took to get here don't assign themselves
         kbMenu.title = "PRESS A KEY";
-        notice("Press a key. B: cancel   SELECT: off");
+        notice("Press a key. Esc: cancel   Backspace: off");
       }
     } else if (menuOpen) {
       if (down(UP))
@@ -2357,8 +2370,9 @@ static void library_present(struct pd_menu *page) {
     for (int y = 0; y < 240 * sc; y++)
       for (int x = 0; x < 320 * sc; x++) {
         uint32_t p = pagePx[(y / sc) * 320 + x / sc] & 0xFFFFFFu;
-        if (p != (KEY_COLOR & 0xFFFFFFu)) // the dimmed list shows through between the boxes
-          overlay.px[(oy + y) * overlay.w + ox + x] = 0xFF000000u | p;
+        const int dx = ox + x, dy = oy + y; // a window smaller than the page cuts it, never writes past the canvas
+        if (p != (KEY_COLOR & 0xFFFFFFu) && dx >= 0 && dy >= 0 && dx < overlay.w && dy < overlay.h)
+          overlay.px[dy * overlay.w + dx] = 0xFF000000u | p;
       }
   }
   overlay_draw(true);
@@ -2531,8 +2545,13 @@ int main(int argc, char **argv) {
   SDL_RendererInfo rendererInfo;
   if (!SDL_GetRendererInfo(renderer, &rendererInfo))
     fprintf(stderr, "Video backend: %s\n", rendererInfo.name);
+#ifdef _WIN32
   // The mouse taps the library and the app's own overlays: its cursor stays on screen.
   SDL_ShowCursor(SDL_ENABLE);
+#else
+  // A handheld (KMSDRM, gamescope) would draw an arrow over the game: hidden until the mouse moves (events_poll).
+  SDL_ShowCursor(SDL_DISABLE);
+#endif
   // SDL starts text input with the window, and Steam answers it with its on-screen keyboard: the host reads keys,
   // never text.
   SDL_StopTextInput();
@@ -2610,6 +2629,10 @@ int main(int argc, char **argv) {
         bool onPage = libraryClick && key_page_pointer(&px, &py);
         if (kbCapture >= 0) {
           // The key that went down is the row's (taken from any other row that had it); SELECT turns it off.
+          if (lastKey == SDLK_ESCAPE)
+            lastKey = 0, pressed |= 1u << B;
+          else if (lastKey == SDLK_BACKSPACE || lastKey == SDLK_DELETE)
+            lastKey = 0, pressed |= 1u << SELECT;
           if (lastKey) {
             for (int i = 0; i < KB_COUNT; i++)
               if (kbKeys[i] == lastKey)

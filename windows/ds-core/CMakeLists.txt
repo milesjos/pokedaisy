@@ -78,7 +78,6 @@ add_library(pokedaisy_ds_libretro MODULE
     pd_ds_overlay.cpp
     pk_nds_gl_stub.cpp
     ${APP}/pk_nds.cpp
-    ${APP}/pk_nds_bigmap.cpp
     ${APP}/pk_nds_platform.cpp
     ${APP}/pk_nds_field_gpu.cpp
     ${APP}/pk_nds_call.cpp

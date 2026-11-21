@@ -72,6 +72,10 @@ uint32_t pk_ndsm_main_ram_size(void);
 // melonDS's cart save memory as it is now (what a libretro frontend reads for RETRO_MEMORY_SAVE_RAM).
 const uint8_t* pk_ndsm_save_data(void);
 uint32_t pk_ndsm_save_length(void);
+// A state in memory (the file's bytes): its length, written to [out] when it fits [cap] (NULL: the length alone; 0: failed).
+size_t pk_ndsm_state_mem(uint8_t* out, size_t cap);
+// Such a state loaded with the battery save the console holds now kept: a libretro frontend owns the save file.
+bool pk_ndsm_load_state_mem_keeping_save(const uint8_t* data, size_t len);
 bool pk_ndsd_init(const char* romPath, const char* savePath, int sampleRate);
 void pk_ndsd_deinit(void);
 bool pk_ndsd_active(void);

@@ -592,15 +592,14 @@ bool pk_ndsd_frame_drawn(void) { return d && d->drawn; }
 
 int pk_ndsd_wide_scene(void)
 {
-    // As pk_nds.cpp's (WideCamera.SCENE_*): the HUD and the hold read it with EXPAND off too, and a text box on the
-    // field is the field, so DS signs and conversations keep the zoom.
+    // As pk_nds.cpp's (WideCamera.SCENE_*): the HUD and the hold read it with EXPAND off too.
     int b = d ? d->fieldBits : 0;
     if (b & PK_NDS_FIELD_BATTLE) return 4;
     u16 mb = d ? d->nds->gpu.engine[0].master_bright() : 0;
     if (((mb >> 14) == 1 || (mb >> 14) == 2) && (mb & 0x1F) >= 16) return 5;
     if (b & PK_NDS_FIELD_MENU) return 6;
     if (!(b & PK_NDS_FIELD_SCREEN)) return 4;
-    return 0;
+    return (b & PK_NDS_FIELD_TEXT) ? 1 : 0;
 }
 
 int pk_ndsd_fade(void)

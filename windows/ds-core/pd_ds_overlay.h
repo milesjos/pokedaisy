@@ -29,6 +29,8 @@ bool overlay_battle();
 // ZOOM is the app's list step, 0 = 1x (EXPAND as it was).
 bool overlay_wide();
 int overlay_zoom();
+// SETTINGS > AUTO ZOOM IN: whether a text box on the field steps the ZOOM in to 1x (the app's rule).
+bool overlay_auto_zoom();
 // Where this frame puts the game's top screen in the picture: the HUD (when the settings have it on) is drawn there, at
 // the screen's own 256x192, over the field and under any overlay. Called once a frame, before overlay_compose.
 void overlay_view(int topX, int topY, bool topShown);

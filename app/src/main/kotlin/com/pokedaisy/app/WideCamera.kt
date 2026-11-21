@@ -65,7 +65,7 @@ class WideCamera {
 
     /** SETTINGS > AUTO ZOOM IN: whether a text box pulls in to 1x ([SCENE_TEXT]); battles, the game's menu screens
      * ([SCENE_MENU]: a zoomed-out one sat small in the middle) and anything else off the map always do, a picture over
-     * the field never. The DS cores report their field text boxes as [SCENE_FIELD], so DS text keeps the zoom. */
+     * the field never. */
     @Volatile var zoomOnText = true
     /** The scenic FLY is in the air (EmulatorEngine.scenicFlight): the widest step, whatever the player picked, and the
      * map's name sign over the field (the controls are locked, so it reads as text) leaves it out there. */

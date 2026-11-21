@@ -722,7 +722,7 @@ static void act(struct pd_ui* ui, int id) {
         };
         // With ZOOM's steps (a host that has them), ASPECT is the app's EXPAND on / off: two values, so it
         // flips in place. A host without them keeps the pick-list.
-        if (id == HIT_SETTING + SETTING_ASPECT && ui->zoomCount > 0) {
+        if (id == HIT_SETTING + SETTING_ASPECT && ui->zoomCount > 1) {
             ui->settings->aspect = ui->settings->aspect == PD_ASPECT_ORIGINAL ? PD_ASPECT_EXPAND : PD_ASPECT_ORIGINAL;
             ui->action = PD_ACTION_SETTINGS_CHANGED;
         } else {
@@ -943,17 +943,6 @@ void pd_ui_focus_move(struct pd_ui* ui, int direction) {
 
 void pd_ui_focus_press(struct pd_ui* ui) {
     if (focus_index(ui, ui->focusId) >= 0) act(ui, ui->focusId);
-}
-
-bool pd_ui_tap(struct pd_ui* ui, int x, int y) {
-    for (int i = ui->hitCount - 1; i >= 0; i--) {
-        const struct pd_hit* h = &ui->hits[i];
-        if (x < h->x || y < h->y || x >= h->x + h->w || y >= h->y + h->h) continue;
-        ui->focusId = h->id;
-        act(ui, h->id);
-        return true;
-    }
-    return false;
 }
 
 bool pd_ui_back(struct pd_ui* ui) {

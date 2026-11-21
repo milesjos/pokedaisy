@@ -994,7 +994,7 @@ static void look_save(void) {
 
 static void check_saves(struct game *g) {
   char sav[PATH_MAX * 2];
-  pd_save_path(savesDir, g->file, sav, sizeof sav);
+  pd_save_path(savesDir, g->path, sav, sizeof sav);
   struct stat st;
   g->hasSave = !stat(sav, &st) && st.st_size > 0;
 }

@@ -136,7 +136,7 @@ On plorpOS, PokeDaisy runs as a core of the launcher's own emulator. The save is
 and the launcher owns save states, fast-forward, rewind, shaders and leaving the game. Pick PokeDaisy in the Core
 row of a Game Boy shelf.
 
-In this form the quick menu (L3) keeps PC, FLY, the keep-away spray, BIKE, WILD ENCOUNTERS, SAVE STATE, LOAD STATE, FF and COMPANION (with TAKE
+In this form the quick menu (L3) keeps PC, FLY, the keep-away spray, BIKE, WILD ENCOUNTERS and COMPANION (with TAKE
 OFF in the English FireRed and Emerald), adds a HUD tile that puts the cursor on the HUD, and the game pauses while it
 is open. X opens the companion. SETTINGS lists only what the core does itself: ASPECT (with ZOOM and AUTO ZOOM IN while it's on), HUD, QUICK MENU, FLY STYLE,
 FLIGHT AREA and FLY ON (where there's TAKE OFF), three button rows, AUTO-RUN (where the game's field is read), DARK
@@ -172,8 +172,7 @@ it was while you rewind.
 ### ASPECT and ZOOM
 
 The companion's `SETTINGS` has the app's `SCREEN` rows: `ASPECT` (the app's `EXPAND` switch), `ZOOM` and `AUTO ZOOM
-IN`. The host menu's old `WIDESCREEN` row is gone; a game you played before this version still starts on `EXPAND`, as
-`WIDESCREEN` left it, and `ORIGINAL` is one press away in `SETTINGS`.
+IN`.
 
 `ASPECT` is `EXPAND` to start with: the picture is laid out for the window you have, so a wide window gets a wide view.
 In a game the companion knows, the field is drawn out to the window's edges at the game's own pixels, with no black
@@ -191,7 +190,7 @@ DS games get the same on the Windows build, drawn by the app's own melonDS engin
 window and the overworld is drawn out to the edges. Battles stay wide too. `ZOOM` steps the whole wide picture out by
 `1.25x`, `1.5x` and `2x` there, so both screens, the HUD and the touch window keep their places. The HUD is drawn after
 the picture is scaled to the window, so it stays as sharp at `1.25x` and `1.5x` as it is at `2x`. A text box or a sign
-on the field keeps that step; only the DS games' battles and menu screens ease back in. When the game asks for
+on the field eases back in while `AUTO ZOOM IN` is on, as in the app; battles and menu screens always do. When the game asks for
 its touch screen, in a menu or in a battle's commands, bag or party, it floats over the wide picture in a framed window
 like the app's `ONE SCREEN`: click or tap inside it to use it, and the game keeps running behind it. Outside a battle the
 window is centred and large. In a battle it is smaller and sits on the left, under the enemy's HP bar, so the
@@ -246,7 +245,8 @@ Delete a file in `covers` to have that game looked up again.
 The program keeps a game's save in its data folder's `saves` folder, named after the whole ROM file name plus
 `.sav`: for `FireRed.gba` that's `saves/FireRed.gba.sav`. A save named after the ROM without its extension works
 too, the way other emulators make them: `saves/FireRed.sav` is found and used for `FireRed.gba`, with no rename
-needed. If both are there, the ROM's own name wins. It's the game's own battery save, so a save from another
+needed, unless another ROM beside it has the same name (`FireRed.gb` next to `FireRed.gba`), when it could be either
+game's. If both are there, the ROM's own name wins. It's the game's own battery save, so a save from another
 emulator works, a RetroArch `.srm` included once it ends in `.sav`. Keep a copy of your old save somewhere else first.
 
 Before a game opens, PokeDaisy backs its save up into `saves/pokedaisy-backups` and keeps the newest 10 copies.
@@ -341,7 +341,7 @@ PokeDaisy only when Steam passes them on.
 ### Keyboard
 
 `KEYBOARD` lists every action with the key it uses, and you can give any of them another key. Pick a row, then press
-the key you want. B cancels, and SELECT turns that row off. A key another row had moves to the one you picked. Your
+the key you want. Escape or B cancels, and Backspace or SELECT turns that row off. A key another row had moves to the one you picked. Your
 keys are kept in `host.ini` in the data folder, so they stay as you set them.
 
 The keys it starts with are the ones above: Z for A, X for B, Enter for START, Backspace for SELECT, the arrows for

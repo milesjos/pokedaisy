@@ -219,9 +219,13 @@ static int messageFrames;
 static char pdStateRoot[1050] = "."; // the save folder's parent: the host's states/<ROM>.ss
 static char pdGamePath[1050];
 static bool quickFf;
+// PokeDaisy's own host (it answers PD_ENV_SET_FAST_FORWARD): the quick menu's SAVE STATE / LOAD STATE / FF are its
+// (its states/ folder, its speed). RetroArch and other frontends keep their own and don't get the tiles.
+static bool pdHost;
 RETRO_API size_t retro_serialize_size(void);
 RETRO_API bool retro_serialize(void *data, size_t size);
 RETRO_API bool retro_unserialize(const void *data, size_t size);
+RETRO_API void retro_get_system_av_info(struct retro_system_av_info *info);
 static void notice(const char *s) {
   snprintf(message, sizeof message, "%s", s);
   messageFrames = 90;
@@ -589,42 +593,6 @@ static void spread_overlay(const uint32_t *px, int w, int h, uint32_t *out) {
       out[(size_t) y * CW + x] = a && d ? a << 24 | (r / d) << 16 | (g / d) << 8 | (b / d) : 0;
     }
 }
-/* The HUD's picture over the four corners of the canvas, [pct] of the canvas's size: each quarter of the picture keeps
- * its own corner, so SIZE's smaller HUD (half) and a ZOOM step's bigger canvas never pull it toward the middle. The
- * source block of each pixel is averaged, so half-size keeps the pixel font's strokes. */
-static void hud_quarters(const uint32_t *px, int w, int h, uint32_t *out, int bw, int bh, int pct) {
-  const int dw = bw * pct / 100, dh = bh * pct / 100;
-  memset(out, 0, (size_t) bw * bh * sizeof *out);
-  if (dw < 2 || dh < 2)
-    return;
-  for (int qy = 0; qy < 2; qy++)
-    for (int qx = 0; qx < 2; qx++) {
-      const int sx0 = w * qx / 2, sxe = w * (qx + 1) / 2, sy0 = h * qy / 2, sye = h * (qy + 1) / 2;
-      const int dx0 = qx ? bw - dw / 2 : 0, dxe = qx ? bw : dw / 2;
-      const int dy0 = qy ? bh - dh / 2 : 0, dye = qy ? bh : dh / 2;
-      const int sw = sxe - sx0, sh = sye - sy0, dqw = dxe - dx0, dqh = dye - dy0;
-      for (int y = dy0; y < dye; y++)
-        for (int x = dx0; x < dxe; x++) {
-          int ax = sx0 + (int) ((long) (x - dx0) * sw / dqw), bx = sx0 + (int) ((long) (x + 1 - dx0) * sw / dqw);
-          int ay = sy0 + (int) ((long) (y - dy0) * sh / dqh), by = sy0 + (int) ((long) (y + 1 - dy0) * sh / dqh);
-          if (bx <= ax)
-            bx = ax + 1;
-          if (by <= ay)
-            by = ay + 1;
-          unsigned r = 0, g = 0, b = 0, sum = 0;
-          for (int sy = ay; sy < by; sy++)
-            for (int sx = ax; sx < bx; sx++) {
-              const uint32_t p = px[(size_t) sy * w + sx], a = p >> 24;
-              r += (p >> 16 & 255) * a;
-              g += (p >> 8 & 255) * a;
-              b += (p & 255) * a;
-              sum += a;
-            }
-          out[(size_t) y * bw + x] = sum ? 0xFF000000u | (r / sum) << 16 | (g / sum) << 8 | (b / sum) : 0;
-        }
-    }
-}
-
 /* The quick menu drawn at w x h laid over the whole canvas, each canvas pixel the area-weighted average of the menu
  * pixels under it (alpha-weighted, so the menu's see-through parts don't darken its edges). Unlike nearest-neighbour
  * at 1.5x it keeps the pixel font's strokes even, softened instead of alternately one and two pixels wide. */
@@ -707,7 +675,10 @@ static void poll_keys(void) {
 }
 static bool down(int k) { return k >= 0 && (pressedKeys >> k & 1) != 0; }
 // L3 is the app's default. Y stays a quick-menu key on a keyboard, where F is Y and there is no L3.
-static bool quick_key(void) { return down(quickBtn) || (quickBtn == L3 && down(Y)); }
+// Y stands in for L3 (devices without stick clicks) only while no other action has Y: else one press did both.
+static bool quick_key(void) {
+  return down(quickBtn) || (quickBtn == L3 && companionBtn != Y && hudBtn != Y && down(Y));
+}
 
 /* What mGBA reads while its frame runs. */
 static int16_t masked_input(unsigned port, unsigned device, unsigned index, unsigned id) {
@@ -739,23 +710,6 @@ static struct pd_host_info host;
 static char settingsPath[1100];
 static char pdDir[1050]; // <save dir>/pokedaisy: settings.ini and FLIGHT AREA's seen maps ("" = none)
 
-/* Did this settings file come from a version with ZOOM (the zoom= line)? A file from before it was written while the
- * host's WIDESCREEN forced EXPAND on screen, so its own aspect= may not be what the player saw; treat it as WIDESCREEN's
- * (EXPAND), as the DS companion does with its own file. */
-static bool settings_has_zoom(const char *path) {
-  FILE *f = path && *path ? fopen(path, "r") : NULL;
-  if (!f)
-    return false;
-  char line[256];
-  bool found = false;
-  while (fgets(line, sizeof line, f))
-    if (!strncmp(line, "zoom=", 5)) {
-      found = true;
-      break;
-    }
-  fclose(f);
-  return found;
-}
 static bool companion, companionWas, haveGame;
 static int frames;
 
@@ -768,7 +722,6 @@ static bool hudFocus, hudShown;
 static bool hudHost, hudNativeOn;
 static int hudNativePct; // SIZE the picture goes over the box for: 100 the whole box, 50 its four corners
 static uint32_t *hudPixels;
-static uint32_t *hudSpreadPx; // the HUD's 1x layout spread over a ZOOM canvas, blended 1:1 (draw_hud)
 static uint32_t hudDrawnKey;
 static int hudW, hudH;
 static int fieldFlags, hudFieldFrames;
@@ -961,8 +914,6 @@ static void draw_hud(void) {
     hudPixels = malloc((size_t)CANVAS_MAX_W * CANVAS_MAX_H * sizeof *hudPixels);
   if (!hudPixels)
     return;
-  if (scale == 1 && !hudSpreadPx)
-    hudSpreadPx = malloc((size_t)CANVAS_MAX_W * CANVAS_MAX_H * sizeof *hudSpreadPx);
   uint32_t key = hud_key(&game, &snap, &hudState, &settings) ^ (uint32_t)(w * 65599 + hh);
   if (key != hudDrawnKey || w != hudW || hh != hudH) {
     struct pd_canvas hc;
@@ -973,7 +924,10 @@ static void draw_hud(void) {
     hudW = w;
     hudH = hh;
   }
-  if (scale == 1 && hudSpreadPx) { // at the window's corners whatever the step, and half size for SMALL and NORMAL
+  // A host that draws the HUD itself (PD_ENV_SET_HUD: the Linux / Windows host) gets it at the window's corners whatever
+  // the step, half size for SMALL and NORMAL. Any other frontend (RetroArch) keeps the HUD in the game's picture, as
+  // before ZOOM.
+  if (scale == 1 && hudHost) {
     hudOx = hudOy = 0;
     hudTW = CW;
     hudTH = CH;
@@ -983,10 +937,6 @@ static void draw_hud(void) {
     // window, so SMALL and NORMAL are as sharp at 1x as they are at 2x (the spread below halves them at 1x).
     hudNativeOn = hudShown;
     hudNativePct = hudPct;
-    if (hudShown && !hudHost) {
-      hud_quarters(hudPixels, w, hh, hudSpreadPx, CW, CH, hudPct);
-      blend_overlay(hudSpreadPx, CW, CH, 1, 0, 0);
-    }
     return;
   }
   hudPct = 100;
@@ -1361,9 +1311,21 @@ static void apply_panel_option(void) {
   if (w == panelW && h == panelH)
     return;
   // The frontend's window changed (resized, fullscreen): the canvas has to follow it, or the picture keeps the
-  // letterbox it was laid out for.
+  // letterbox it was laid out for. A larger maximum needs the frontend's texture remade (SET_SYSTEM_AV_INFO):
+  // SET_GEOMETRY may only change the base size.
+  const int oldMaxW = CWMAX, oldMaxH = CHMAX;
   choose_canvas();
-  canvas_update(true);
+  canvas_update(false);
+  if (!realEnv)
+    return;
+  if (CWMAX > oldMaxW || CHMAX > oldMaxH) {
+    struct retro_system_av_info av;
+    retro_get_system_av_info(&av);
+    realEnv(RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO, &av);
+  } else {
+    struct retro_game_geometry g = {(unsigned)CW, (unsigned)CH, (unsigned)CWMAX, (unsigned)CHMAX, (float)CW / (float)CH};
+    realEnv(RETRO_ENVIRONMENT_SET_GEOMETRY, &g);
+  }
 }
 
 /* ---- entry points ---- */
@@ -1438,10 +1400,10 @@ RETRO_API bool retro_load_game(const struct retro_game_info *g) {
   }
   frameLate = false;
   quickFf = false;
-  if (realEnv)
-    realEnv(PD_ENV_SET_FAST_FORWARD, &quickFf);
-  cvs = calloc((size_t)CWMAX * CHMAX, sizeof *cvs);
-  out565 = calloc((size_t)CWMAX * CHMAX, sizeof *out565);
+  pdHost = realEnv && realEnv(PD_ENV_SET_FAST_FORWARD, &quickFf);
+  // At the largest canvas the core ever lays out, not this panel's: the panel (and with it CWMAX) can change mid-game.
+  cvs = calloc((size_t)CANVAS_MAX_W * CANVAS_MAX_H, sizeof *cvs);
+  out565 = calloc((size_t)CANVAS_MAX_W * CANVAS_MAX_H, sizeof *out565);
   if (!cvs || !out565)
     return false;
   pd_canvas_init(&canvas, CW, CH, cvs);
@@ -1476,12 +1438,8 @@ RETRO_API bool retro_load_game(const struct retro_game_info *g) {
     snprintf(settingsPath, sizeof settingsPath, "pokedaisy-settings.ini");
     snprintf(pdStateRoot, sizeof pdStateRoot, ".");
   }
-  const bool hadSettings = pd_settings_load(&settings, settingsPath);
-  // The desktop's first launch ran with the host's WIDESCREEN on: keep EXPAND as it was until the player's own ASPECT
-  // (the app's), or ZOOM's steps, say otherwise. A file from before ZOOM has no zoom= line (the row's own key) and so
-  // was written while WIDESCREEN forced EXPAND: start it on EXPAND too. ZOOM OUT became EXPAND's first step.
-  if (!hadSettings || !settings_has_zoom(settingsPath))
-    settings.aspect = PD_ASPECT_EXPAND;
+  pd_settings_load(&settings, settingsPath);
+  // ZOOM OUT became EXPAND's first ZOOM step. Every other file keeps its own ASPECT (ORIGINAL by default).
   if (settings.aspect == PD_ASPECT_ZOOM_OUT) {
     settings.aspect = PD_ASPECT_EXPAND;
     if (settings.zoom < 1)
@@ -1558,9 +1516,9 @@ RETRO_API bool retro_load_game(const struct retro_game_info *g) {
   job = JOB_NONE;
   quick_set_grid(settings.quickGrid);
   if (!ovPixels)
-    ovPixels = calloc((size_t)CWMAX * CHMAX, sizeof *ovPixels);
+    ovPixels = calloc((size_t)CANVAS_MAX_W * CANVAS_MAX_H, sizeof *ovPixels);
   if (!ovScratch)
-    ovScratch = calloc((size_t)CWMAX * CHMAX, sizeof *ovScratch);
+    ovScratch = calloc((size_t)CANVAS_MAX_W * CANVAS_MAX_H, sizeof *ovScratch);
   pd_ui_init(&ui, &settings);
   ui.handheldDex = ui.handheldParty = ui.guideController = ui.shoulderTabs = true;
   if (polishedActions) {
@@ -1671,14 +1629,12 @@ RETRO_API void retro_unload_game(void) {
   free(cvs);
   free(out565);
   free(hudPixels);
-  free(hudSpreadPx);
   free(ovPixels);
   free(ovScratch);
   ovPixels = ovScratch = NULL;
   cvs = NULL;
   out565 = NULL;
   hudPixels = NULL;
-  hudSpreadPx = NULL;
   haveGame = false;
 }
 
@@ -1854,9 +1810,7 @@ RETRO_API void retro_run(void) {
     snapshot(); // FLASH dims on who knows it and the lit flag: read as the menu opens, not up to 30 frames old
   // A tap on the quick menu: a tile (or a FLY / REPEL list row) is picked as A picks it; outside, the list or the menu
   // closes as B. On the field, a tap that starts and ends on one HUD part presses it; the game picture itself does nothing.
-  if (touch_tapped() && companion && !quickOpen) {
-    pd_ui_tap(&ui, touchX0, touchY0); // a tap on the companion presses the part under it, as the cursor's A does
-  } else if (touch_tapped() && quickOpen && !companion) {
+  if (touch_tapped() && quickOpen && !companion) {
     const int x = touchX * quick_width() / CW, y = touchY * quick_height() / CH;
     int i = (flyList || repelList) ? quick_list_hit(x, y) : quick_hit(x, y);
     if (i >= 0) {
@@ -1968,10 +1922,20 @@ RETRO_API void retro_run(void) {
   if (wildSwitch || gbf || polishedActions)
     quick[quickN++] = (struct quick_item){QUICK_WILD, settings.wildOff, false,
         settings.wildOff ? NULL : pcFieldWhy, 0, 0, NULL};
-  quick[quickN++] = (struct quick_item){QUICK_SAVE_STATE, false, false, NULL, 0, 0, NULL};
-  quick[quickN++] = (struct quick_item){QUICK_LOAD_STATE, false, false,
-      quick_state_exists() ? NULL : "No state saved yet", 0, 0, NULL};
-  quick[quickN++] = (struct quick_item){QUICK_FF, false, quickFf, NULL, 0, 0, NULL};
+  if (pdHost) {
+    // The slot's file looked at only while the menu is open (a file check a frame cost frames on SD cards).
+    static bool stateThere;
+    static int stateChecked;
+    if (quickOpen && --stateChecked <= 0) {
+      stateThere = quick_state_exists();
+      stateChecked = 30;
+    } else if (!quickOpen) {
+      stateChecked = 0;
+    }
+    quick[quickN++] = (struct quick_item){QUICK_SAVE_STATE, false, false, NULL, 0, 0, NULL};
+    quick[quickN++] = (struct quick_item){QUICK_LOAD_STATE, false, false, stateThere ? NULL : "No state saved yet", 0, 0, NULL};
+    quick[quickN++] = (struct quick_item){QUICK_FF, false, quickFf, NULL, 0, 0, NULL};
+  }
   if (host.hasHud && settings.hud)
     quick[quickN++] = (struct quick_item){QUICK_HUD, false, false, hudShown && hudHits.n ? NULL : "No HUD on screen", 0, 0, NULL};
   quick[quickN++] = (struct quick_item){QUICK_COMPANION, false, false, NULL, 0, 0, NULL};

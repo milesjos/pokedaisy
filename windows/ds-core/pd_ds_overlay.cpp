@@ -734,6 +734,7 @@ bool overlay_hud_native(struct pd_hud* msg)
     return true;
 }
 bool overlay_wide() { return shell.settings.aspect != PD_ASPECT_ORIGINAL; }
+bool overlay_auto_zoom() { return shell.settings.autoZoom; }
 int overlay_zoom() {
     const int zoom = shell.settings.zoom;
     return zoom < 0 ? 0 : zoom > 3 ? 3 : zoom;
@@ -1057,6 +1058,7 @@ unsigned overlay_keys(unsigned pressed, unsigned heldKeys)
             quickSelected = 0;
             holdFrames = 0;
             flyPicker = repelPicker = false;
+            flyWhy = nullptr; // FLY asks again each time the menu opens (else one refusal dimmed it for good)
             refresh();
             return kAll;
         }
@@ -1094,6 +1096,7 @@ unsigned overlay_keys(unsigned pressed, unsigned heldKeys)
                 quickSelected = 0;
                 holdFrames = 0;
                 flyPicker = repelPicker = false;
+                flyWhy = nullptr;
                 refresh();
                 return kAll;
             }

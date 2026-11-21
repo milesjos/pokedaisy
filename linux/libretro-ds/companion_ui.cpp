@@ -33,12 +33,12 @@ constexpr Companion::Row defaultOrder[]={
 // HUD opens the shared HUD page (pd_ui_settings.c's hud_page: on/off, LOOK, SIZE and each part), as on the GB/GBA cores;
 // HudSize, HudBalls, HudRepel and HudMap stay rows of the enum for settings files and apply(), not of the list.
 const char* const layoutNames[]={"ONE SCREEN","TOP","BOTTOM","SIDE BY SIDE","STACKED","LARGE + SMALL","PICTURE IN PICTURE"};
-const char* const zoomNames[]={"1x","1.2x","1.5x","2x"};
+const char* const zoomNames[]={"1x","1.25x","1.5x","2x"};
 const char* const onOffNames[]={"OFF","ON"};
 const char* const buttonNames[]={"L2","R2","X","Y","NONE"};
 const unsigned buttonIds[]={RETRO_DEVICE_ID_JOYPAD_L2,RETRO_DEVICE_ID_JOYPAD_R2,RETRO_DEVICE_ID_JOYPAD_X,RETRO_DEVICE_ID_JOYPAD_Y};
-const char* const hudButtonNames[]={ "X", "Y", "L2", "R2", "NONE" };
-const int hudButtonIds[]={RETRO_DEVICE_ID_JOYPAD_X,RETRO_DEVICE_ID_JOYPAD_Y,RETRO_DEVICE_ID_JOYPAD_L2,RETRO_DEVICE_ID_JOYPAD_R2,-1};
+const char* const hudButtonNames[]={ "X", "Y", "L2", "R2", "NONE", "L3" }; // by enum pd_button
+const int hudButtonIds[]={RETRO_DEVICE_ID_JOYPAD_X,RETRO_DEVICE_ID_JOYPAD_Y,RETRO_DEVICE_ID_JOYPAD_L2,RETRO_DEVICE_ID_JOYPAD_R2,-1,RETRO_DEVICE_ID_JOYPAD_L3};
 const char* const speedNames[]={"SLOW","NORMAL","FAST"};
 const char* const hudSizeNames[]={ "SMALL", "NORMAL", "LARGE" };
 const char* const resetNames[]={"CANCEL","RESET"};
@@ -629,7 +629,7 @@ void DsCompanionUi::tap_act(int id){
     }
   }else if(id>=DS_HIT_DEX_SECTION && id<DS_HIT_DEX_SECTION+4){
     dexSection=static_cast<DsDexSection>(id-DS_HIT_DEX_SECTION);dexDetailRow=0;
-  }else if(id>=HIT_OPTION && id<HIT_OPTION+16){
+  }else if(id>=HIT_OPTION && id<HIT_OPTION+32){ // room for SETTINGS' longest list (18 rows with EXPAND)
     const int row=id-HIT_OPTION;
     if(picker>=0){
       const int which=picker;picker=-1;choice=std::clamp(row,0,count(which)-1);apply(which,choice);
