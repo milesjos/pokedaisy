@@ -57,7 +57,7 @@ static const unsigned retroId[NKEYS] = {
 static const struct retro_core_option_v2_definition pdOptions[PD_OPTION_COUNT] = {
     {"pokedaisy_canvas", "Companion canvas", NULL, "The frame size the core reports: the game sits in it at a whole scale, the companion fills it. auto = 320x240.", NULL, NULL,
      {{"auto", NULL}, {"320x240", NULL}, {"341x256", NULL}, {"400x300", NULL}, {"427x240", NULL}, {NULL, NULL}}, "auto"},
-    {"pokedaisy_panel", "Panel size", NULL, "The frontend's screen. With it the core picks its own canvas: EXPAND at the game's whole scale, ZOOM OUT one scale less. auto = the canvas option alone.", NULL, NULL,
+    {"pokedaisy_panel", "Panel size", NULL, "The frontend's screen. With it the core picks its own canvas: EXPAND at the game's whole scale, each ZOOM step one whole scale further out. auto = the canvas option alone.", NULL, NULL,
      {{"auto", NULL}, {"480x320", NULL}, {"480x800", NULL}, {"640x480", NULL}, {"720x480", NULL}, {"720x540", NULL}, {"720x720", NULL}, {"752x560", NULL}, {"960x544", NULL}, {"960x720", NULL}, {"1024x768", NULL}, {"1280x720", NULL}, {"1600x1440", NULL}, {"1920x1080", NULL}, {NULL, NULL}}, "auto"},
     {"pokedaisy_aspect", "Aspect", NULL, "How the game fills the screen where the host can draw past the game's edges: expand (the app's EXPAND, the map rebuilt out to the edges at the game's own scale), zoom (one scale less, more of the map), original (the game's own frame), auto (the core's own ASPECT setting).", NULL, NULL,
      {{"auto", NULL}, {"expand", NULL}, {"zoom", NULL}, {"original", NULL}, {NULL, NULL}}, "auto"},
@@ -399,7 +399,8 @@ static void draw_game(void) {
   if (!outputBuffer || !gameW || !gameH)
     return;
   if (wideReady) {
-    int ws = game_scale(wideW, wideH);
+    // The wide view is the canvas's own pixels (wide_window): 1:1, never scaled back up to fill a ZOOM canvas.
+    const int ws = 1;
     int wx = (CW - (int)wideW * ws) / 2, wy = (CH - (int)wideH * ws) / 2;
     for (unsigned y = 0; y < wideH; y++)
       for (int k = 0; k < ws; k++) {
@@ -460,7 +461,7 @@ static void draw_game_fast(void) {
   if (!outputBuffer || !gameW || !gameH)
     return;
   if (wideReady) {
-    int ws = game_scale(wideW, wideH);
+    const int ws = 1; // wide_window's pixels: 1:1 (ZOOM's canvas is shown smaller by the frontend)
     int wx = (CW - (int)wideW * ws) / 2, wy = (CH - (int)wideH * ws) / 2;
     for (unsigned y = 0; y < wideH; y++) {
       int cy = wy + (int)y * ws;
@@ -695,6 +696,24 @@ static struct pd_snapshot snap;
 static struct pd_host_info host;
 static char settingsPath[1100];
 static char pdDir[1050]; // <save dir>/pokedaisy: settings.ini and FLIGHT AREA's seen maps ("" = none)
+
+/* Did this settings file come from a version with ZOOM (the zoom= line)? A file from before it was written while the
+ * host's WIDESCREEN forced EXPAND on screen, so its own aspect= may not be what the player saw; treat it as WIDESCREEN's
+ * (EXPAND), as the DS companion does with its own file. */
+static bool settings_has_zoom(const char *path) {
+  FILE *f = path && *path ? fopen(path, "r") : NULL;
+  if (!f)
+    return false;
+  char line[256];
+  bool found = false;
+  while (fgets(line, sizeof line, f))
+    if (!strncmp(line, "zoom=", 5)) {
+      found = true;
+      break;
+    }
+  fclose(f);
+  return found;
+}
 static bool companion, companionWas, haveGame;
 static int frames;
 
@@ -901,17 +920,13 @@ static void draw_hud(void) {
 /* ---- game-code layer: EXPAND (pk_wide), the field read, WILD ENCOUNTERS ---- */
 
 
-/* The EXPAND window for the canvas and a fw x fh game: the canvas over the game's whole scale (one less for
- * ZOOM OUT), within pk_wide's largest view, never smaller than the game, even margins. */
-static void wide_window(int aspect, unsigned fw, unsigned fh, unsigned *w, unsigned *h) {
+/* The EXPAND window for the canvas and a fw x fh game: the canvas itself, in game pixels (pk_wide's largest view at
+ * most), never smaller than the game, even margins. The canvas is the panel over a whole scale (canvas_for), so the
+ * frontend shows it back at that scale: 1x the game's own pixels. ZOOM's steps grow this canvas (canvas_for), the game
+ * stays 1:1 in it and the frontend scales all of it down (draw_game), which is the map further out. */
+static void wide_window(unsigned fw, unsigned fh, unsigned *w, unsigned *h) {
   int width = CW / canvasScale, height = CH / canvasScale;
-  int sx = width / (int)fw, sy = height / (int)fh;
-  int scale = sx < sy ? sx : sy;
-  if (aspect == PD_ASPECT_ZOOM_OUT)
-    scale--;
-  if (scale < 1)
-    scale = 1;
-  unsigned x = (unsigned)width / scale, y = (unsigned)height / scale;
+  unsigned x = (unsigned)width, y = (unsigned)height;
   x = x > PK_WIDE_MAX_VIEW_W ? PK_WIDE_MAX_VIEW_W : x < fw ? fw : x;
   y = y > PK_WIDE_MAX_VIEW_H ? PK_WIDE_MAX_VIEW_H : y < fh ? fh : y;
   *w = x - ((x - fw) & 1);
@@ -921,10 +936,7 @@ static void wide_window(int aspect, unsigned fw, unsigned fh, unsigned *w, unsig
 static bool rewinding;   // the frontend is rewinding: the camera stays where the aspect put it (no AUTO ZOOM IN on the odd frames)
 /* The window for this frame, in the game frame's pixels (and wideW x wideH set). */
 static struct PkWideView wide_rect(unsigned fw, unsigned fh) {
-  int last = pk_wide_scene();
-  int aspect = settings.aspect == PD_ASPECT_ZOOM_OUT && settings.autoZoom && last != PK_WIDE_SCENE_FIELD && !rewinding
-                   ? PD_ASPECT_EXPAND : settings.aspect;
-  wide_window(aspect, fw, fh, &wideW, &wideH);
+  wide_window(fw, fh, &wideW, &wideH);
   return (struct PkWideView){((int)fw - (int)wideW) / 2, ((int)fh - (int)wideH) / 2, (int)wideW, (int)wideH};
 }
 
@@ -1067,9 +1079,10 @@ static void wide_tick(void) {
   wideReady = !pk_wide_fault();
 }
 
-/* The canvas for a fw x fh game on the panel: the panel over the game's whole scale (one less for ZOOM OUT), so the
- * frontend shows it at exactly that integer scale. EXPAND's window is the whole canvas. */
-static void canvas_for(int fw, int fh, int kind, int *w, int *h) {
+/* The canvas for a fw x fh game on the panel: the panel over the game's whole scale, one whole scale less per ZOOM step
+ * (and one for a kind that isn't EXPAND), so the frontend shows it at exactly that integer scale. EXPAND's window is the
+ * whole canvas. */
+static void canvas_for(int fw, int fh, int kind, int extra, int *w, int *h) {
   int s;
   if (kind == CANVAS_MENU) {
     // The companion and its menus: the largest whole scale that still leaves them 320x240, the host menu's rule and
@@ -1080,6 +1093,7 @@ static void canvas_for(int fw, int fh, int kind, int *w, int *h) {
     s = panelW / fw < panelH / fh ? panelW / fw : panelH / fh;
     if (kind != CANVAS_EXPAND && s > 1)
       s--;
+    s -= extra; // ZOOM: each step shows one whole game scale more of the map
   }
   if (s < 1)
     s = 1;
@@ -1101,12 +1115,21 @@ static void choose_canvas(void) {
   baseGH = (int)av.geometry.base_height;
   panelW = panelH = 0;
   v = pd_option("pokedaisy_panel");
-  if (v && sscanf(v, "%dx%d", &panelW, &panelH) == 2 && panelW > 0 && panelH > 0)
-    canvas_for(baseGW, baseGH, CANVAS_MENU, &CWMAX, &CHMAX);
-  else
+  if (v && sscanf(v, "%dx%d", &panelW, &panelH) == 2 && panelW > 0 && panelH > 0) {
+    canvas_for(baseGW, baseGH, CANVAS_MENU, 0, &menuW, &menuH);
+    // The frontend makes its texture max_width x max_height once, so the maximum has to be the widest canvas a ZOOM step
+    // asks for (the panel over one game scale), not the companion's: the GB core drew nothing from the second step on.
+    const int mw = panelW < baseGW ? baseGW : panelW;
+    const int mh = panelH < baseGH ? baseGH : panelH;
+    CWMAX = mw > CANVAS_MAX_W ? CANVAS_MAX_W : mw;
+    CHMAX = mh > CANVAS_MAX_H ? CANVAS_MAX_H : mh;
+  } else {
     panelW = panelH = 0;
-  menuW = CW = CWMAX;
-  menuH = CH = CHMAX;
+    menuW = CWMAX;
+    menuH = CHMAX;
+  }
+  CW = menuW;
+  CH = menuH;
   canvasScale = 1;
   if (PD_BE_IS_GBA()) {
     CWMAX = CANVAS_MAX_W;
@@ -1120,9 +1143,71 @@ static int want_canvas(void) {
     return CANVAS_MENU;
   if (settings.aspect == PD_ASPECT_ORIGINAL)
     return PD_BE_IS_GBA() ? CANVAS_EXPAND : CANVAS_ZOOM;
-  if (!wideSupported || settings.aspect != PD_ASPECT_ZOOM_OUT)
-    return CANVAS_EXPAND;
-  return settings.autoZoom && !rewinding && pk_wide_scene() != PK_WIDE_SCENE_FIELD ? CANVAS_EXPAND : CANVAS_ZOOM;
+  return CANVAS_EXPAND; // the ZOOM step is the canvas's size (want_zoom)
+}
+
+/* ZOOM's steps for this game and panel (the companion's SETTINGS > SCREEN > ZOOM list): the canvas one whole game scale
+ * further out each, up to the panel's whole scale and the largest canvas the core holds. 0 is 1x (EXPAND as it was). */
+#define ZOOM_STEPS_MAX 6
+static char zoomText[ZOOM_STEPS_MAX][8];
+static const char *zoomTextPtr[ZOOM_STEPS_MAX];
+static int zoomStepCount;
+static int zoom_canvas(int fw, int fh, int level, int *w, int *h) {
+  if (!panelW || fw <= 0 || fh <= 0)
+    return 0;
+  int s = panelW / fw < panelH / fh ? panelW / fw : panelH / fh;
+  s -= level;
+  if (s < 1)
+    return 0;
+  int x = panelW / s, y = panelH / s;
+  if (x > CANVAS_MAX_W || y > CANVAS_MAX_H || x < fw || y < fh)
+    return 0;
+  *w = x, *h = y;
+  return 1;
+}
+/* How much more of the map a step shows, as the app's list says it ("1x", "1.4x"): the canvas's width over 1x's. */
+static int zoom_steps(void) {
+  int fw = (int)(gameW ? gameW : (unsigned)baseGW), fh = (int)(gameH ? gameH : (unsigned)baseGH);
+  int base = 0, n = 0;
+  for (int i = 0; i < ZOOM_STEPS_MAX; i++) {
+    int w = 0, h = 0;
+    if (!zoom_canvas(fw, fh, i, &w, &h))
+      break;
+    if (!i)
+      base = w;
+    int tenths = base > 0 ? (w * 10 + base / 2) / base : 10;
+    if (tenths < 10)
+      tenths = 10;
+    if (tenths % 10)
+      snprintf(zoomText[i], sizeof zoomText[i], "%d.%dx", tenths / 10, tenths % 10);
+    else
+      snprintf(zoomText[i], sizeof zoomText[i], "%dx", tenths / 10);
+    zoomTextPtr[i] = zoomText[i];
+    n++;
+  }
+  zoomStepCount = n;
+  return n;
+}
+static int want_zoom(void) {
+  if (settings.aspect == PD_ASPECT_ORIGINAL || !wideSupported)
+    return 0;
+  int level = settings.zoom + (settings.aspect == PD_ASPECT_ZOOM_OUT ? 1 : 0); // a file from before the list: its one step
+  // AUTO ZOOM IN keeps the step on the plain overworld and steps in everywhere else (a text box, a battle, a menu, a
+  // fade, a title), or they'd sit small in the middle of the window. Off, the step is the player's: it stays on every
+  // screen. (The DS cores report their field text boxes as the field, so a DS sign keeps the step either way.)
+  const int scene = pk_wide_scene();
+  if (!rewinding && settings.autoZoom && scene != PK_WIDE_SCENE_FIELD)
+    level = 0;
+  int n = zoom_steps();
+  if (level >= n)
+    level = n > 0 ? n - 1 : 0;
+  return level < 0 ? 0 : level;
+}
+/* Tell the companion's SETTINGS the steps (pd_host_info): no row for a game that can't EXPAND, or a panel with only 1x. */
+static void zoom_host_update(void) {
+  zoom_steps();
+  host.zoomCount = zoomStepCount;
+  host.zoomLabels = zoomStepCount > 0 ? zoomTextPtr : NULL;
 }
 
 /* Follow the aspect: when the wanted canvas differs, resize it and tell the frontend (it rescales to the new whole factor). */
@@ -1132,8 +1217,10 @@ static void canvas_update(bool notify) {
   if (PD_BE_IS_GBA() && !companion && settings.aspect == PD_ASPECT_ORIGINAL && fw && fh) {
     w = (int)fw;
     h = (int)fh;
-  } else if (panelW)
-    canvas_for((int)fw, (int)fh, want_canvas(), &w, &h);
+  } else if (panelW) {
+    const int kind = want_canvas();
+    canvas_for((int)fw, (int)fh, kind, kind == CANVAS_MENU ? 0 : want_zoom(), &w, &h);
+  }
   // While the Quick Menu is open, double the game pixels exactly so menu text and icons
   // draw at output resolution. Gameplay stays at 1x: a doubled canvas costs every frame
   // four times the pixels (Brick: 4.5 -> 7.1 ms per shown frame).
@@ -1171,14 +1258,16 @@ static void apply_aspect_option(void) {
   const char *a = pd_option("pokedaisy_aspect");
   if (!a || !strcmp(a, "auto"))
     return;
-  int aspect = settings.aspect;
+  int aspect = settings.aspect, zoom = settings.zoom;
   if (!strcmp(a, "expand"))
     settings.aspect = PD_ASPECT_EXPAND;
-  else if (!strcmp(a, "zoom"))
-    settings.aspect = PD_ASPECT_ZOOM_OUT;
+  else if (!strcmp(a, "zoom")) {
+    settings.aspect = PD_ASPECT_EXPAND;
+    settings.zoom = 1;
+  }
   else if (!strcmp(a, "original"))
     settings.aspect = PD_ASPECT_ORIGINAL;
-  if (settings.aspect != aspect && CW > 0)
+  if ((settings.aspect != aspect || settings.zoom != zoom) && CW > 0)
     canvas_update(true);
 }
 static void apply_panel_option(void) {
@@ -1299,7 +1388,17 @@ RETRO_API bool retro_load_game(const struct retro_game_info *g) {
     snprintf(settingsPath, sizeof settingsPath, "pokedaisy-settings.ini");
     snprintf(pdStateRoot, sizeof pdStateRoot, ".");
   }
-  pd_settings_load(&settings, settingsPath);
+  const bool hadSettings = pd_settings_load(&settings, settingsPath);
+  // The desktop's first launch ran with the host's WIDESCREEN on: keep EXPAND as it was until the player's own ASPECT
+  // (the app's), or ZOOM's steps, say otherwise. A file from before ZOOM has no zoom= line (the row's own key) and so
+  // was written while WIDESCREEN forced EXPAND: start it on EXPAND too. ZOOM OUT became EXPAND's first step.
+  if (!hadSettings || !settings_has_zoom(settingsPath))
+    settings.aspect = PD_ASPECT_EXPAND;
+  if (settings.aspect == PD_ASPECT_ZOOM_OUT) {
+    settings.aspect = PD_ASPECT_EXPAND;
+    if (settings.zoom < 1)
+      settings.zoom = 1;
+  }
   pd_look_apply(&game, &settings); // DARK MODE (pd_game_detect applied the game's windows with no settings)
   autoRunFlip = 0;
   read_options(); // the frontend's ASPECT, over the file's own
@@ -1605,6 +1704,8 @@ RETRO_API void retro_run(void) {
   }
   apply_aspect_option(); // the frontend's ASPECT can change mid-game: a lookup a frame, a resize only when it does
   apply_panel_option();  // so can its window: the canvas is laid out for the panel again when that changes
+  zoom_host_update();    // the companion's ZOOM list follows the game's size and the window
+  canvas_update(true);   // the companion's ASPECT / ZOOM may have changed: resize only when it does
   quickBtn = key_of(settings.quickBtn);
   companionBtn = key_of(settings.companionBtn);
   hudBtn = key_of(settings.hudBtn);

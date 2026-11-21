@@ -262,6 +262,8 @@ void ui_settings_tab(struct pd_ui* ui, struct pd_canvas* c, const struct pd_game
     struct pd_settings* st = ui->settings;
     bool full = host && host->fullSettings;
     ui->viewExpand = host && host->hasExpand && host->expandGame;
+    ui->zoomCount = host ? host->zoomCount : 0;
+    ui->zoomLabels = host ? host->zoomLabels : NULL;
     if (full) group(c, ix, &y, "GAME");
     if (s->valid) {
         const char* place = pd_mapsec_name(g, s->mapsec);
@@ -349,10 +351,19 @@ void ui_settings_tab(struct pd_ui* ui, struct pd_canvas* c, const struct pd_game
                 pd_screen_mode_name(ui->pixelOff && st->screenMode == PD_SCREEN_PIXEL ? PD_SCREEN_SHARP_125 : st->screenMode));
     if (host && host->hasExpand) {
         if (host->expandGame) {
-            setting(ui, c, ix, &y, iw, SETTING_ASPECT, "ASPECT", pd_aspect_name(st->aspect));
-            // Two values: flips in place (the app's rule for pick-lists is more than two). Only
-            // ZOOM OUT has anything to step back from.
-            if (st->aspect == PD_ASPECT_ZOOM_OUT)
+            // ASPECT is the app's EXPAND on / off (two values, so it flips in place); ZOOM steps the view out
+            // (the app's SETTINGS > SCREEN > ZOOM), and only then is there anything for AUTO ZOOM IN to do.
+            const bool zoomRow = host->zoomCount > 1 && host->zoomLabels;
+            const bool expanded = st->aspect != PD_ASPECT_ORIGINAL;
+            setting(ui, c, ix, &y, iw, SETTING_ASPECT, "ASPECT",
+                    zoomRow ? (expanded ? "EXPAND" : "ORIGINAL") : pd_aspect_name(st->aspect));
+            if (zoomRow && expanded) {
+                int z = st->zoom < 0 ? 0 : st->zoom >= host->zoomCount ? host->zoomCount - 1 : st->zoom;
+                setting(ui, c, ix, &y, iw, SETTING_ZOOM, "ZOOM", host->zoomLabels[z]);
+            }
+            // AUTO ZOOM IN sits right under ZOOM whenever EXPAND is on (the app's SCREEN group): at 1x it has no step to
+            // take yet, and at the first one it is already there.
+            if (expanded && (st->aspect == PD_ASPECT_ZOOM_OUT || zoomRow))
                 setting(ui, c, ix, &y, iw, SETTING_AUTO_ZOOM, "AUTO ZOOM IN", st->autoZoom ? "ON" : "OFF");
         } else {
             // This game's overworld can't be rebuilt: shown, not tappable.
@@ -656,6 +667,10 @@ void ui_overlay(struct pd_ui* ui, struct pd_canvas* c) {
     }
     case PD_OVERLAY_PICK_ASPECT:
         pick_list(ui, c, "ASPECT", ASPECT_NAMES, PD_ASPECTS, ui->settings->aspect);
+        break;
+    case PD_OVERLAY_PICK_ZOOM:
+        if (ui->zoomCount > 0 && ui->zoomLabels)
+            pick_list(ui, c, "ZOOM", ui->zoomLabels, ui->zoomCount, ui->settings->zoom);
         break;
     case PD_OVERLAY_PICK_VIEW: {
         const bool expand = ui->viewExpand;

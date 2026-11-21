@@ -138,14 +138,14 @@ row of a Game Boy shelf.
 
 In this form the quick menu (L3) keeps PC, FLY, the keep-away spray, BIKE, WILD ENCOUNTERS, SAVE STATE, LOAD STATE, FF and COMPANION (with TAKE
 OFF in the English FireRed and Emerald), adds a HUD tile that puts the cursor on the HUD, and the game pauses while it
-is open. X opens the companion. SETTINGS lists only what the core does itself: ASPECT, HUD, QUICK MENU, FLY STYLE,
+is open. X opens the companion. SETTINGS lists only what the core does itself: ASPECT (with ZOOM and AUTO ZOOM IN while it's on), HUD, QUICK MENU, FLY STYLE,
 FLIGHT AREA and FLY ON (where there's TAKE OFF), three button rows, AUTO-RUN (where the game's field is read), DARK
 MODE, TAB BAR and RESET SETTINGS, which puts every companion setting back after you confirm. QUICK MENU BUTTON,
 COMPANION BUTTON and HUD CURSOR BUTTON step through X, Y, L2, R2 and L3 (and NONE for the cursor) when you press A on
 them, and a button another action already uses swaps over to it. L2 and R2 reach the core on every shelf (for other
 Game Boy Advance cores the launcher still keeps them back).
 
-In Polished Crystal 3.2.3 (the normal build) the core also has `EXPAND` and `ZOOM OUT`, and the quick menu gets PC,
+In Polished Crystal 3.2.3 (the normal build) the core also has `EXPAND` and `ZOOM`, and the quick menu gets PC,
 FLY, the keep-away spray, BIKE and WILD ENCOUNTERS, each done through the game's own menus. In a battle, X opens the
 companion's BATTLE tab: a command or move you pick there plays out in the game.
 
@@ -155,34 +155,46 @@ open the same press closes it first), Up and Down choose one and `A` opens it; R
 ### The picture in the launcher
 
 The core sizes its picture to the screen so the game is always shown at a whole scale. On the Brick (1024x768)
-`EXPAND` draws the game at 4x with the map rebuilt out to the screen's edges, and `ZOOM OUT` at 3x, so you see more
-of the map. `ORIGINAL` shows the game on its own. The companion and the quick menu always use the 3x picture.
+`EXPAND` draws the game at 4x with the map rebuilt out to the screen's edges, and each `ZOOM` step shows one whole
+scale further out (3x, 2x), so you see more of the map with the game smaller. `ORIGINAL` shows the game on its own.
+The companion and the quick menu always use the 3x picture.
 
-`AUTO ZOOM IN` (Settings) works as in the app: with `ZOOM OUT` chosen, anything but the plain overworld (menus, the
-START menu, battles, text boxes) steps in to the `EXPAND` picture, and it steps back out when you return to the
-field. Building interiors are the overworld, so nothing steps in there. Turn `AUTO ZOOM IN` off to stay zoomed out
-through menus.
+`AUTO ZOOM IN` (Settings) works as in the app: with a `ZOOM` step chosen, a sign or a conversation steps in to `1x`,
+and it steps back out when the text closes. Battles, the START menu and every other menu screen step in whatever the
+setting says, as in the app, and so do a game's title screen and its name entry. Building interiors are the overworld,
+so nothing steps in there. Turn `AUTO ZOOM IN` off to stay zoomed out through signs and conversations.
 
 Fast-forward rebuilds the map as normal play does, so the picture stays sharp out to the edges. When the device
 can't keep up, a frame now and then shows the last picture again instead. After a state load, and all through
-rewind, the map past the edges is there at once. Rewind keeps the aspect you chose, so `ZOOM OUT` stays zoomed out
-while you rewind.
+rewind, the map past the edges is there at once. Rewind keeps the aspect you chose, so your `ZOOM` step stays where
+it was while you rewind.
 
-### Widescreen
+### ASPECT and ZOOM
 
-`WIDESCREEN` is `ON` to start with. The picture is laid out for the window you have, so a wide window gets a wide view:
-in a game the companion knows, the field is drawn out to the window's edges at the game's own scale, with no black bars
-around it, and the extra space shows the map either side of the route you are on. It is the app's `EXPAND`, and `ZOOM
-OUT` in the companion's `SETTINGS` still shows one scale further out. Set it to `OFF` to see the game's own smaller
-picture, centred.
+The companion's `SETTINGS` has the app's `SCREEN` rows: `ASPECT` (the app's `EXPAND` switch), `ZOOM` and `AUTO ZOOM
+IN`. The host menu's old `WIDESCREEN` row is gone; a game you played before this version still starts on `EXPAND`, as
+`WIDESCREEN` left it, and `ORIGINAL` is one press away in `SETTINGS`.
+
+`ASPECT` is `EXPAND` to start with: the picture is laid out for the window you have, so a wide window gets a wide view.
+In a game the companion knows, the field is drawn out to the window's edges at the game's own pixels, with no black
+bars around it, and the extra space shows the map either side of the route you are on. `ORIGINAL` shows the game's own
+smaller picture, centred.
+
+`ZOOM` steps the view out the way the app's `ZOOM` hotkey does: `1x`, then each whole scale the window and the core's
+canvas allow (`1.3x`, `2x` on a 720p window). The game stays at its own pixels and the map reaches the edges at
+every step, so a step shows more of the route around you with the game a little smaller. `AUTO ZOOM IN` sits right
+under it, `ON` by default: battles, conversations, text boxes and menus ease back in to `1x`, and the field eases back
+out to your step. Each game keeps its own, and a window too small for a step doesn't offer it.
 
 DS games get the same on the Windows build, drawn by the app's own melonDS engine: the screen sits in the middle of the
-window and the overworld is drawn out to the edges. Battles stay wide too. When the game asks for its touch screen, in
-a menu or in a battle's commands, bag or party, it floats over the wide picture in a framed window like the app's
-`ONE SCREEN`: click or tap inside it to use it, and the game keeps running behind it. Outside a battle the window is
-centred and large. In a battle it is smaller and sits on the left, under the enemy's HP bar, so the battlefield, both
-Pokemon and their bars stay in view. R2 still switches to the bottom screen by itself until pressed again. Fullscreen,
-windowed and every size in between lay it out again.
+window and the overworld is drawn out to the edges. Battles stay wide too. `ZOOM` steps the whole wide picture out by
+`1.25x`, `1.5x` and `2x` there, so both screens, the HUD and the touch window keep their places. A text box or a sign
+on the field keeps that step; only the DS games' battles and menu screens ease back in. When the game asks for
+its touch screen, in a menu or in a battle's commands, bag or party, it floats over the wide picture in a framed window
+like the app's `ONE SCREEN`: click or tap inside it to use it, and the game keeps running behind it. Outside a battle the
+window is centred and large. In a battle it is smaller and sits on the left, under the enemy's HP bar, so the
+battlefield, both Pokemon and their bars stay in view. R2 still switches to the bottom screen by itself until pressed
+again. Fullscreen, windowed and every size in between lay it out again.
 
 Resizing the window, maximising it or going fullscreen lays the picture out again for the new size, so a 16:9 screen
 gets the wide view rather than the bars the old window would have, and so does a window stretched across three 1080p
@@ -263,7 +275,7 @@ keeps the flight to [places you've already been](map.md#where-you-can-fly) (`VIS
 LeafGreen, Ruby, Sapphire and Emerald the quick menu has [`FLASH`](controls.md#the-quick-menu) too, to light up a dark
 cave once a Pokémon in your party knows the move; it's greyed out where it isn't dark. The
 [HUD](hud.md) shows your party and a small map over the overworld, and [EXPAND](screen.md#expand-more-of-the-map)
-is `ASPECT` in the companion's `SETTINGS`, with `ZOOM OUT` for even more of the map. The quick menu's tiles follow your HUD look, in two shades with an orange outline on the
+is `ASPECT` in the companion's `SETTINGS`, with `ZOOM` for even more of the map. The quick menu's tiles follow your HUD look, in two shades with an orange outline on the
 one you're on, and the HUD's panels have a battle-style shadow, with an HP bar and room for a status tag on each
 party Pokémon.
 
@@ -300,7 +312,6 @@ pauses while it's open.
 | `REWIND` | `ON` keeps the last 20 seconds or so to rewind through. |
 | `FF SPEED` | How fast fast-forward goes: `MAX`, or 2x to 8x. |
 | `LCD FILTER` | A screen texture like a handheld's. |
-| `WIDESCREEN` | `ON` fills the screen with the map drawn out past the game's edges, the app's [EXPAND](screen.md#expand-more-of-the-map). |
 | `A/B BUTTONS` | `NORMAL` or `SWAPPED`, for devices whose A and B are the other way round. |
 | `QUIT` | Leave the game (`QUIT TO GAME LIST` when you picked it from the list). It asks first. |
 

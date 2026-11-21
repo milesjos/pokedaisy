@@ -567,6 +567,7 @@ static void act(struct pd_ui* ui, int id) {
             if (ui->overlay == PD_OVERLAY_PICK_SCREEN) ui->settings->screenMode = i + (ui->pixelOff ? 1 : 0);
             if (ui->overlay == PD_OVERLAY_PICK_FF && i < PD_FF_CHOICES) ui->settings->ffSpeed = PD_FF_SPEEDS[i];
             if (ui->overlay == PD_OVERLAY_PICK_ASPECT && i < PD_ASPECTS) ui->settings->aspect = i;
+            if (ui->overlay == PD_OVERLAY_PICK_ZOOM && i < ui->zoomCount) ui->settings->zoom = i;
             if (ui->overlay == PD_OVERLAY_PICK_VIEW) pd_view_set(ui->settings, i, ui->viewExpand);
             if (ui->overlay == PD_OVERLAY_PICK_SPEED) ui->settings->gameSpeed = i;
             if (ui->overlay == PD_OVERLAY_PICK_SCENE && i < PD_SCENE_SPEED_COUNT) ui->settings->sceneSpeed[ui->scenePick] = i;
@@ -708,6 +709,8 @@ static void act(struct pd_ui* ui, int id) {
     } else if (id == HIT_SETTING + SETTING_AUTO_ZOOM) {
         ui->settings->autoZoom = !ui->settings->autoZoom;
         ui->action = PD_ACTION_SETTINGS_CHANGED;
+    } else if (id == HIT_SETTING + SETTING_ZOOM) {
+        ui->overlay = PD_OVERLAY_PICK_ZOOM;
     } else if (id >= HIT_SETTING && id <= HIT_SETTING + SETTING_ASPECT) {
         static const enum pd_overlay OPENS[] = {
             [SETTING_SCREEN] = PD_OVERLAY_PICK_SCREEN,
@@ -717,7 +720,14 @@ static void act(struct pd_ui* ui, int id) {
             [SETTING_LEAVE] = PD_OVERLAY_CONFIRM_LEAVE,
             [SETTING_ASPECT] = PD_OVERLAY_PICK_ASPECT,
         };
-        ui->overlay = OPENS[id - HIT_SETTING];
+        // With ZOOM's steps (a host that has them), ASPECT is the app's EXPAND on / off: two values, so it
+        // flips in place. A host without them keeps the pick-list.
+        if (id == HIT_SETTING + SETTING_ASPECT && ui->zoomCount > 0) {
+            ui->settings->aspect = ui->settings->aspect == PD_ASPECT_ORIGINAL ? PD_ASPECT_EXPAND : PD_ASPECT_ORIGINAL;
+            ui->action = PD_ACTION_SETTINGS_CHANGED;
+        } else {
+            ui->overlay = OPENS[id - HIT_SETTING];
+        }
     }
 }
 

@@ -4,7 +4,7 @@
 the ROM from its own folder. It uses `pokedaisy_gba_libretro.so` for `.gba` (armGBA, `libretro/armgba/`),
 `pokedaisy_gbc_libretro.so` for `.gb` / `.gbc` (mGBA, `libretro/`), or `pokedaisy_ds_libretro.so` for `.nds`
 (DSperate, `linux/libretro-ds/`), and shows what the core draws. So the companion,
-the HUD, the quick menu (PC, FLY, TAKE OFF, FLASH, REPEL, BIKE, WILD ENCOUNTERS), EXPAND and every companion setting are the cores'
+the HUD, the quick menu (PC, FLY, TAKE OFF, FLASH, REPEL, BIKE, WILD ENCOUNTERS), EXPAND, ZOOM and every companion setting are the cores'
 own, the same as on any other frontend, and a change to them reaches this executable with the next core build.
 
 The host owns what a frontend owns: input, sound, pacing, the battery save and its backups, save states,
@@ -76,7 +76,8 @@ mapping. It is otherwise ignored unless you explicitly set `POCKET_RAW_TRIMUI=1`
 layout.
 
 `POCKET_FULLSCREEN=1` uses SDL's current display mode. The host tells the core the screen's size (its
-`pokedaisy_panel` option), so the core picks its canvas for that screen (EXPAND at the game's whole scale, the
+`pokedaisy_panel` option), so the core picks its canvas for that screen (EXPAND at the game's whole scale, each ZOOM
+step one whole scale further out, the
 companion at the largest whole scale keeping 320x240: 320x240 on 640x480, 426x240 on 1280x720, 341x256 on 1024x768,
 480x270 on 1920x1080, the DS core's companion too), and the host shows the frame at the largest whole scale that
 fits, centred. `POCKET_WINDOW=WxH` opens the window at a device's panel size instead (1280x800, 1280x720, 640x480,

@@ -12,6 +12,7 @@ void pd_settings_defaults(struct pd_settings* s) {
     // SHARP 1.5x everywhere: the Linux / libretro cores and the host tests (the user's call, 2026-11-16) and the 3DS (2026-11-17:
     // EXPAND, its default for 1.6.0, took frames and memory a 3DS in the 80 MB mode doesn't have to spare); EXPAND is in VIEW.
     s->aspect = PD_ASPECT_ORIGINAL;
+    s->zoom = 0;
     s->autoZoom = true;
     s->wildOff = false;
     s->tabBar = PD_TAB_BAR_DEFAULT;
@@ -106,6 +107,7 @@ bool pd_settings_load(struct pd_settings* s, const char* path) {
         else if (!strcmp(key, "librarygrid")) s->libraryGrid = atoi(value) != 0;
         else if (!strcmp(key, "libraryrecent")) s->libraryRecent = atoi(value) != 0;
         else if (!strcmp(key, "aspect")) int_in(value, 0, PD_ASPECTS - 1, &s->aspect);
+        else if (!strcmp(key, "zoom")) int_in(value, 0, 7, &s->zoom);
         else if (!strcmp(key, "autozoom")) {
             int on;
             if (int_in(value, 0, 1, &on)) s->autoZoom = on;
@@ -178,8 +180,8 @@ bool pd_settings_save(const struct pd_settings* s, const char* path) {
     snprintf(tmp, sizeof(tmp), "%s.tmp", path);
     FILE* f = fopen(tmp, "w");
     if (!f) return false;
-    fprintf(f, "screen=%d\nff=%d\nguide=%d\naspect=%d\nautozoom=%d\nwildoff=%d\ntabs=%d\nhud=%d\nhudhide=%d\nquickgrid=%d\nlcd=%d\n",
-            s->screenMode, s->ffSpeed, s->guideNotice, s->aspect, s->autoZoom ? 1 : 0, s->wildOff ? 1 : 0, s->tabBar,
+    fprintf(f, "screen=%d\nff=%d\nguide=%d\naspect=%d\nzoom=%d\nautozoom=%d\nwildoff=%d\ntabs=%d\nhud=%d\nhudhide=%d\nquickgrid=%d\nlcd=%d\n",
+            s->screenMode, s->ffSpeed, s->guideNotice, s->aspect, s->zoom, s->autoZoom ? 1 : 0, s->wildOff ? 1 : 0, s->tabBar,
             s->hud ? 1 : 0, s->hudHidden, s->quickGrid ? 1 : 0, s->lcdFilter ? 1 : 0);
     fprintf(f, "hudlayout=%d\nhudlook=%d\nhudsize=%d\n", s->hudLayout, s->hudLook, s->hudSize);
     fprintf(f, "scaling=%d\nffaudio=%d\nrewind=%d\nrunindoors=%d\n", s->scaling, s->ffAudio ? 1 : 0,

@@ -598,8 +598,7 @@ static struct {
   int modifier;
   bool fullscreen; // the WINDOW setting
   int panel;       // the PANEL setting: 0 = the window's size, else a preset the core lays out for
-  bool widescreen; // the core's ASPECT: EXPAND (the app's own widescreen fix) instead of the game's own frame
-} hostSet = {0, false, false, false, {R2, L2, -1, -1}, {R2, L2, -1, -1}, SELECT, false, 0, true};
+} hostSet = {0, false, false, false, {R2, L2, -1, -1}, {R2, L2, -1, -1}, SELECT, false, 0};
 static char hostIni[PATH_MAX];
 /* A DS game's L2 / R2 are its companion and screen buttons: with no modifier held for them, its FAST FORWARD and REWIND
  * go back to the stick clicks (R3 / L3), and come back to R2 / L2 when a modifier is picked again. */
@@ -640,8 +639,6 @@ static void host_load(void) {
       hostSet.fullscreen = v != 0;
     if (sscanf(line, "panel=%d", &v) == 1 && v >= 0 && v < PD_PANEL_PRESETS)
       hostSet.panel = v;
-    if (sscanf(line, "widescreen=%d", &v) == 1)
-      hostSet.widescreen = v != 0;
     char modifier[16];
     if (sscanf(line, "hk_modifier=%15s", modifier) == 1) {
       int k = key_named(modifier);
@@ -680,7 +677,7 @@ static void host_save(void) {
   if (!f)
     return;
   fprintf(f, "ff_speed=%d\nrewind=%d\nlcd=%d\nswap_ab=%d\n", hostSet.ffSpeed, hostSet.rewind, hostSet.lcd, hostSet.swapAB);
-  fprintf(f, "fullscreen=%d\npanel=%d\nwidescreen=%d\n", hostSet.fullscreen, hostSet.panel, hostSet.widescreen);
+  fprintf(f, "fullscreen=%d\npanel=%d\n", hostSet.fullscreen, hostSet.panel);
   fprintf(f, "hk_modifier=%s\n", key_name(hostSet.modifier));
   for (int i = 0; i < HK_ACTIONS; i++) {
     fprintf(f, "hk_%s=%s\n", hotkeyIds[i], key_name(hostSet.hotkey[i]));
@@ -978,8 +975,9 @@ static bool environment(unsigned cmd, void *data) {
       v->value = panelValue;
     if (!strcmp(v->key, "pokedaisy_window"))
       v->value = windowValue;
+    // ASPECT is the companion's own (the app's SETTINGS > SCREEN): auto leaves its file's setting be.
     if (!strcmp(v->key, "pokedaisy_aspect"))
-      v->value = hostSet.widescreen ? "expand" : "original";
+      v->value = "auto";
     for (int i = 0; i < optionN && !v->value; i++)
       if (!strcmp(options[i].key, v->key))
         v->value = options[i].value;
@@ -1701,7 +1699,7 @@ extern int pd_ds_run(const char *, const char *, int, const char *, SDL_Renderer
 static bool ds_running(void) { return running != 0; }
 #endif
 // The host menu's rows, top to bottom (fast-forward is the FAST FORWARD hotkey's, held).
-enum { M_RESUME, M_SAVE, M_LOAD, M_HOTKEYS, M_KEYBOARD, M_REWIND, M_FFSPEED, M_LCD, M_WIDESCREEN, M_SWAP, M_QUIT,
+enum { M_RESUME, M_SAVE, M_LOAD, M_HOTKEYS, M_KEYBOARD, M_REWIND, M_FFSPEED, M_LCD, M_SWAP, M_QUIT,
        M_COUNT };
 static void run_game(const char *path, int maxFrames, const char *shot, bool fromList) {
 #ifdef POCKET_DSPERATE
@@ -1859,7 +1857,6 @@ static void run_game(const char *path, int maxFrames, const char *shot, bool fro
       snprintf(rows[M_FFSPEED], 40, "FF SPEED  MAX");
     snprintf(rows[M_REWIND], 40, "REWIND  %s", hostSet.rewind ? "ON" : "OFF");
     snprintf(rows[M_LCD], 40, "LCD FILTER  %s", hostSet.lcd ? "ON" : "OFF");
-    snprintf(rows[M_WIDESCREEN], 40, "WIDESCREEN  %s", hostSet.widescreen ? "ON" : "OFF");
     snprintf(rows[M_SWAP], 40, "A/B BUTTONS  %s", hostSet.swapAB ? "SWAPPED" : "NORMAL");
     snprintf(rows[M_HOTKEYS], 40, "HOTKEYS");
     snprintf(rows[M_KEYBOARD], 40, "KEYBOARD");
@@ -2069,11 +2066,6 @@ static void run_game(const char *path, int maxFrames, const char *shot, bool fro
           break;
         case M_LCD:
           hostSet.lcd = !hostSet.lcd;
-          host_save();
-          break;
-        case M_WIDESCREEN:
-          hostSet.widescreen = !hostSet.widescreen;
-          optionsChanged = true; // the core reads its aspect again and resizes the canvas for it
           host_save();
           break;
         case M_SWAP:

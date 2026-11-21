@@ -25,15 +25,16 @@ extern "C" {
 namespace {
 constexpr int dsTabs=(1<<PD_TAB_PARTY)|(1<<PD_TAB_BAG)|(1<<PD_TAB_MAP)|(1<<PD_TAB_GUIDE)|(1<<PD_TAB_DEX);
 using Companion=DsCompanionUi;
-constexpr Companion::Row settingsOrder[]={
+constexpr Companion::Row defaultOrder[]={
   Companion::Layout,Companion::Hud,Companion::QuickStyle,Companion::CompanionButton,Companion::HudButton,Companion::TabBar,Companion::MoreTabs,
   Companion::HudMinimal,Companion::Battles,Companion::BattleStrip,Companion::AutoRun,Companion::ScreenButton,Companion::PenSpeed,
   Companion::DarkMode,Companion::Reset
 };
 // HUD opens the shared HUD page (pd_ui_settings.c's hud_page: on/off, LOOK, SIZE and each part), as on the GB/GBA cores;
 // HudSize, HudBalls, HudRepel and HudMap stay rows of the enum for settings files and apply(), not of the list.
-constexpr int listed=int(std::size(settingsOrder));
 const char* const layoutNames[]={"ONE SCREEN","TOP","BOTTOM","SIDE BY SIDE","STACKED","LARGE + SMALL","PICTURE IN PICTURE"};
+const char* const zoomNames[]={"1x","1.2x","1.5x","2x"};
+const char* const onOffNames[]={"OFF","ON"};
 const char* const buttonNames[]={"L2","R2","X","Y","NONE"};
 const unsigned buttonIds[]={RETRO_DEVICE_ID_JOYPAD_L2,RETRO_DEVICE_ID_JOYPAD_R2,RETRO_DEVICE_ID_JOYPAD_X,RETRO_DEVICE_ID_JOYPAD_Y};
 const char* const hudButtonNames[]={ "X", "Y", "L2", "R2", "NONE" };
@@ -41,13 +42,15 @@ const int hudButtonIds[]={RETRO_DEVICE_ID_JOYPAD_X,RETRO_DEVICE_ID_JOYPAD_Y,RETR
 const char* const speedNames[]={"SLOW","NORMAL","FAST"};
 const char* const hudSizeNames[]={ "SMALL", "NORMAL", "LARGE" };
 const char* const resetNames[]={"CANCEL","RESET"};
-const char* const labels[]={"DS LAYOUT","AUTO BATTLES","HUD","COMPANION BUTTON","SCREEN BUTTON","STYLUS SPEED","QUICK MENU","RESET SETTINGS","BATTLE STRIP","MINIMAL HUD","POKé BALLS","REPEL STEPS","MINIMAP","DARK MODE","AUTO-RUN","TAB BAR","MORE TABS","HUD CURSOR BUTTON","HUD SIZE"};
+const char* const labels[]={"DS LAYOUT","AUTO BATTLES","HUD","COMPANION BUTTON","SCREEN BUTTON","STYLUS SPEED","QUICK MENU","RESET SETTINGS","BATTLE STRIP","MINIMAL HUD","POKé BALLS","REPEL STEPS","MINIMAP","DARK MODE","AUTO-RUN","TAB BAR","MORE TABS","HUD CURSOR BUTTON","HUD SIZE","ASPECT","ZOOM","AUTO ZOOM IN"};
 const char* const* choices(int row){
+  if(row==DsCompanionUi::Zoom)return zoomNames;
+  if(row==DsCompanionUi::Aspect||row==DsCompanionUi::AutoZoom)return onOffNames;
   if(row==DsCompanionUi::HudSize)return hudSizeNames;
   return row==DsCompanionUi::Layout?layoutNames:row==DsCompanionUi::PenSpeed?speedNames:
     row==DsCompanionUi::Reset?resetNames:row==DsCompanionUi::HudButton?hudButtonNames:buttonNames;
 }
-int count(int row){return row==DsCompanionUi::HudSize?PD_HUD_SIZES:row==DsCompanionUi::Layout?DS_LAYOUTS:row==DsCompanionUi::CompanionButton?4:
+int count(int row){return row==DsCompanionUi::Zoom?4:row==DsCompanionUi::Aspect||row==DsCompanionUi::AutoZoom?2:row==DsCompanionUi::HudSize?PD_HUD_SIZES:row==DsCompanionUi::Layout?DS_LAYOUTS:row==DsCompanionUi::CompanionButton?4:
  row==DsCompanionUi::ScreenButton||row==DsCompanionUi::HudButton?5:row==DsCompanionUi::PenSpeed?3:2;}
 }
 void DsCompanionUi::defaults(){
@@ -56,7 +59,9 @@ void DsCompanionUi::defaults(){
   layout=0;autoBattles=1;companionButton=0;screenButton=1;penSpeed=1;battleStrip=true;hudMinimal=false;darkMode=false;autoRun=false;
 }
 void DsCompanionUi::init(const std::string& directory,int legacyLayout,bool legacyHud){
-  *this=DsCompanionUi{};defaults();layout=std::clamp(legacyLayout,0,4);settings.hud=legacyHud;
+  const bool expandHost=hasExpand;
+  *this=DsCompanionUi{};hasExpand=expandHost;defaults();layout=std::clamp(legacyLayout,0,4);settings.hud=legacyHud;
+  bool sawZoom=false;
   if(!directory.empty()){
     const std::string sub=directory+"/pokedaisy-ds";
     if(mkdir(sub.c_str(),0755)==0 || errno==EEXIST)path=sub+"/settings.ini";
@@ -87,12 +92,17 @@ void DsCompanionUi::init(const std::string& directory,int legacyLayout,bool lega
       if(key=="ds_darkmode" && v<2)darkMode=v;
       if(key=="ds_autorun" && v<2)autoRun=v;
       if(key=="ds_penspeed" && v<3)penSpeed=v;
+      if(key=="zoom")sawZoom=true;
     }
   }
+  // A host with EXPAND, on a settings file from before ZOOM (the row is new): EXPAND on, as the host's WIDESCREEN used to
+  // force. A file with zoom= keeps whatever ASPECT the player picked, on or off.
+  if(hasExpand && (!loaded || !sawZoom))settings.aspect=PD_ASPECT_EXPAND;
   if(companionButton==screenButton)screenButton=(companionButton+1)%4;
   if(hud_id()<0)settings.hudBtn=PD_BTN_NONE;
   settings.tabBar &= dsTabs;
   if (!settings.tabBar) settings.tabBar=dsTabs;
+  build_order();
   pd_ui_init(&frame,&settings);pd_ui_init(&options,&settings);
   frame.availableTabs=dsTabs;
   options.keepBackdrop=true;
@@ -141,6 +151,9 @@ int DsCompanionUi::hud_id()const{
 }
 int DsCompanionUi::pen_step()const{return penSpeed==0?1:penSpeed==1?3:6;}
 int DsCompanionUi::value(int row)const{
+  if(row==Aspect)return settings.aspect==PD_ASPECT_ORIGINAL?0:1;
+  if(row==Zoom)return std::clamp(settings.zoom,0,3);
+  if(row==AutoZoom)return settings.autoZoom?1:0;
   if(row==HudButton)return settings.hudBtn;
   if(row==HudSize)return settings.hudSize;
   if(row==DarkMode)return darkMode;
@@ -152,7 +165,10 @@ int DsCompanionUi::value(int row)const{
     row==CompanionButton?companionButton:row==ScreenButton?screenButton:row==PenSpeed?penSpeed:row==QuickStyle?settings.quickGrid:row==BattleStrip?battleStrip:0;
 }
 void DsCompanionUi::apply(int row,int v){
-  if(row==Layout){layout=v;++displayRevision;}
+  if(row==Aspect){settings.aspect=v?PD_ASPECT_EXPAND:PD_ASPECT_ORIGINAL;build_order();}
+  else if(row==Zoom)settings.zoom=v;
+  else if(row==AutoZoom)settings.autoZoom=v!=0;
+  else if(row==Layout){layout=v;++displayRevision;}
   else if(row==Battles)autoBattles=v;
   else if(row==Hud)settings.hud=v;
   else if(row==CompanionButton){
@@ -186,18 +202,32 @@ void DsCompanionUi::apply(int row,int v){
   else if(row==Reset && v){defaults();++displayRevision;frame.settings=&settings;options.settings=&settings;}
   save();
 }
+
+/* The settings list: DS LAYOUT, then the app's SCREEN rows on a host with EXPAND (ASPECT always, ZOOM and AUTO ZOOM IN
+ * while it's on), then the companion's own. Rebuilt when ASPECT changes and on load. */
+void DsCompanionUi::build_order(){
+  order.clear();
+  order.push_back(Layout);
+  if(hasExpand){
+    order.push_back(Aspect);
+    if(settings.aspect != PD_ASPECT_ORIGINAL){order.push_back(Zoom);order.push_back(AutoZoom);}
+  }
+  for(const Row row:defaultOrder)if(row!=Layout)order.push_back(row);
+  if(std::find(order.begin(),order.end(),setting)==order.end())setting=hasExpand?Aspect:Layout;
+}
 void DsCompanionUi::draw_settings(pd_canvas* c){
   const auto& s=*snapshot;
   char money[32];
   pd_ui_format_money(s.valid?s.money:-1,money,sizeof money);
   const char* values[]={layoutNames[layout],autoBattles?"ON":"OFF",settings.hud?"ON":"OFF",
     buttonNames[companionButton],buttonNames[screenButton],speedNames[penSpeed],settings.quickGrid?"GRID":"RING","...",battleStrip?"ON":"OFF",hudMinimal?"ON":"OFF",value(HudBalls)?"ON":"OFF",value(HudRepel)?"ON":"OFF",value(HudMap)?"ON":"OFF",darkMode?"ON":"OFF",game==DsGame::Unsupported?"N/A":autoRun?"ON":"OFF",game==DsGame::Unsupported?"N/A":"EDIT",
-    (settings.tabBar & dsTabs)==dsTabs?"NONE HIDDEN":"OPEN",hudButtonNames[settings.hudBtn],hudSizeNames[value(HudSize)]};
+    (settings.tabBar & dsTabs)==dsTabs?"NONE HIDDEN":"OPEN",hudButtonNames[settings.hudBtn],hudSizeNames[value(HudSize)],
+    settings.aspect==PD_ASPECT_ORIGINAL?"ORIGINAL":"EXPAND",zoomNames[std::clamp(settings.zoom,0,3)],settings.autoZoom?"ON":"OFF"};
   constexpr int infoCount=3;
   pd_option_row rows[Rows+infoCount]={{"PLACE",s.valid?ds_place(s.map,s.game):"-"},
     {"MONEY",money},{"HOST","PokeDaisy core"}};
   int n=infoCount;
-  for(const int row:settingsOrder){
+  for(const int row:order){
     if(row==setting)options.optionSelected=n;
     rows[n++]={labels[row],values[row]};
   }
@@ -384,8 +414,9 @@ bool DsCompanionUi::control(unsigned pressed){
     if(hit(RETRO_DEVICE_ID_JOYPAD_A)){int row=picker;picker=-1;apply(row,choice);}return false;
   }
   if(frame.tab==PD_TAB_SETTINGS){
-    const int index=int(std::find(std::begin(settingsOrder),std::end(settingsOrder),setting)-std::begin(settingsOrder));
-    setting=settingsOrder[pd_ui_list_step(index,listed,dy)];
+    const int index=int(std::find(order.begin(),order.end(),setting)-order.begin());
+    const int n=int(order.size());
+    setting=order[pd_ui_list_step(index<0||index>=n?0:index,n,dy)];
     if(hit(RETRO_DEVICE_ID_JOYPAD_B))return true;
     if(hit(RETRO_DEVICE_ID_JOYPAD_A))activate_setting();
     return false;
@@ -606,8 +637,8 @@ void DsCompanionUi::tap_act(int id){
       // A tap on a PLACES row goes there at once, as A does.
       const int pick=std::clamp(placeFirst+row,0,std::max(0,int(mapPlaces.size())-1));
       if(pick< int(mapPlaces.size())){const auto pos=mapPlaces[pick].position;mapX=pos.x;mapY=pos.y;placeRow=mapAction=-1;}
-    }else if(frame.tab==PD_TAB_SETTINGS && row<int(std::size(settingsOrder))){
-      setting=settingsOrder[row];activate_setting();
+    }else if(frame.tab==PD_TAB_SETTINGS && row<int(order.size())){
+      setting=order[row];activate_setting();
     }
   }else if(id==DS_HIT_MAP){
     if(art){const auto cell=ds_map_cell_at(game,*art,mapView,tapX,tapY);mapX=cell.x;mapY=cell.y;mapAction=-1;}

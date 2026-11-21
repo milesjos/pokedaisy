@@ -8,8 +8,13 @@ extern "C" {
 #include "pd_settings.h"
 }
 struct DsCompanionUi {
-  enum Row { Layout, Battles, Hud, CompanionButton, ScreenButton, PenSpeed, QuickStyle, Reset, BattleStrip, HudMinimal, HudBalls, HudRepel, HudMap, DarkMode, AutoRun, TabBar, MoreTabs, HudButton, HudSize, Rows };
+  enum Row { Layout, Battles, Hud, CompanionButton, ScreenButton, PenSpeed, QuickStyle, Reset, BattleStrip, HudMinimal, HudBalls, HudRepel, HudMap, DarkMode, AutoRun, TabBar, MoreTabs, HudButton, HudSize, Aspect, Zoom, AutoZoom, Rows };
   pd_settings settings{};
+  // A host whose picture can EXPAND (the Windows core): its SETTINGS gain ASPECT, ZOOM and AUTO ZOOM IN, and it lays the
+  // game out for settings.aspect / settings.zoom (the app's SETTINGS > SCREEN). Off: the DS layouts alone.
+  bool hasExpand=false;
+  std::vector<Row> order; // settingsOrder: the list shown, ASPECT / ZOOM / AUTO ZOOM IN first when hasExpand
+  void build_order();
   pd_ui frame{}, options{};
   pd_snapshot battle{};
   unsigned displayRevision=0;
