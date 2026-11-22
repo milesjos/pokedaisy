@@ -866,7 +866,7 @@ change to any of the places listed under "Where it's decided" updates its rows h
   invisible sprite whose callback is SpriteCallbackDummy (`SwitchAddrs.cursorSpriteCallback`), checked headless on English and French
   Ruby rev 1 (DOWN, A, SHIFT sent slot 1 in; gPlayerParty in battle order while the menu is up, as FireRed's); not Japanese R / S.
 - **Hide battle menu** (two screens; not a column: it follows the battle buttons): `PokeDaisyActivity.battleMenuHideSupported`
-  (a BPR / BPG / BPE header running as FireRed / Emerald with the battle buttons' addresses and the one-press picks' cursors:
+  (a BPR / BPG / BPE header, or Ultra Violet's PUVV, running as FireRed / Emerald with the battle buttons' addresses and the one-press picks' cursors:
   the D-pad steers the hidden action menu by writing gActionSelectionCursor, `HiddenMenuSteer`), the menus found on screen by
   `pk_wide.c`'s `menuHideBegin` (no address of its own; gBattleTypeFlags keeps doubles' and the Safari Zone's). Checked
   headless on English FireRed rev 1 and Emerald (mgba_dump `battlemenu`), then (2026-11-15) a wild battle in every covered
@@ -878,7 +878,8 @@ change to any of the places listed under "Where it's decided" updates its rows h
   edge with the frame's T + 6 tile, so the plain middle is T + 7 (the Western ones' too). Ruby / Sapphire too (2026-11-18): their cursor is
   sprites (menu_cursor.c), hidden for the frame with the menu (the shown OBJ entries whose top is inside the box), and their empty
   message box has no text tiles of its own, so the sign borrows the hidden menu's (off screen that frame); both menus hidden with the
-  sign drawn on English Ruby rev 1.
+  sign drawn on English Ruby rev 1. Ultra Violet too (2026-11-24): FireRed rev 0 under its own code PUVV, which the check now takes;
+  both menus hidden with the sign drawn on its own save.
 - **One-press picks**: `NativeConfig.actionCursor` / `moveCursor`, handed out only for a hash-verified ROM
   (`TelemetrySampler.knownCursorAddrs`; a randomized retail ROM's masked hash counts, `RandomizedRetail`), or for a hack
   whose code proves retail's engine (`RetailEngine`, note 30). Configs made with `.copy()` inherit them: zero them where the RAM moved.

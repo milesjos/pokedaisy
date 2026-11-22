@@ -1764,7 +1764,9 @@ class PokeDaisyActivity : Activity() {
      * menuHideBegin; Ruby / Sapphire's cursor sprites hidden with it, the sign drawn in the hidden menu's own tiles) whose
      * battles the companion's buttons can steer (the battle input read). */
     private fun battleMenuHideSupported() = !romIsGameBoy && !romIsNds && romBlocked == null && ::engine.isInitialized &&
-        listOf("BPR", "BPG", "BPE", "AXV", "AXP").any { romCode.startsWith(it) } &&
+        // Ultra Violet (PUVV) is FireRed rev 0 under a code of its own: checked headless, both menus hidden, the sign drawn.
+        (listOf("BPR", "BPG", "BPE", "AXV", "AXP").any { romCode.startsWith(it) } ||
+            romCode.startsWith(com.pokedaisy.app.companion.data.TelemetrySampler.ULTRA_VIOLET_CODE)) &&
         com.pokedaisy.app.companion.data.activeGame.let {
             it == com.pokedaisy.app.companion.data.GameKind.FIRERED || it == com.pokedaisy.app.companion.data.GameKind.EMERALD
         } && com.pokedaisy.app.companion.data.activeNativeConfig?.hasBattleInputAddrs == true &&
