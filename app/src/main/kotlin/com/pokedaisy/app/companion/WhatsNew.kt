@@ -52,7 +52,7 @@ object WhatsNew {
                 NEW,
                 listOf(
                     "New games: Clover, Elysium, Sacred Gold and Storm Silver, Oops All Eevees!, Rhythm, Ceruleum, RecordKeepers, Red and Yellow with Gen II Graphics, Italian Unbound, and the German Platinum.",
-                    "New look: the menus in the games' own summary colours, a move page, and FONT to pick the app's letters.",
+                    "New look: the menus in the games' summary style in PokeDaisy's blue, a move page, and FONT to pick the app's letters.",
                     "POKéMON PICTURES: each Pokémon's own picture on PARTY, in the summary, in battle and on the HUD.",
                     "Summary: drag a Pokémon's moves into a new order, and see an egg's types and stats before it hatches.",
                     "ITEM POPUPS and MOVE ADVICE: a card when you pick up an item, and advice on which move to forget.",

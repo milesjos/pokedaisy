@@ -294,8 +294,9 @@ pixel, so there its text was as large for the screen as on a GBA): `LocalTextSte
    reference" errors — delete `build/kotlin` if errors look impossible).
 
 **The menus' look is SUMMARY MINT** (2026-11-12, the user's pick of eight looks tried; `theme/UiStyle.kt`, `UiStyles`,
-`OptionColors.style`): the OPTION pieces below drawn over a `UiStylePalette` - Emerald's summary pages (sampled headless): a teal
-header joined to a mint list window (`OptionTitleWindow(joined)`, `WindowGap`), green section bands (`StyledGroupTitle`), banded
+`OptionColors.style`): the OPTION pieces below drawn over a `UiStylePalette` - Emerald's summary pages (sampled headless), in PokeDaisy's
+blue since 1.6.2 (`retroStylePalette`; the teal kept as `summaryMintTealPalette`; a THEME rehues it, `themedStylePalette`): a blue
+header joined to a pale list window (`OptionTitleWindow(joined)`, `WindowGap`), green section bands (`StyledGroupTitle`), banded
 rows, SETTINGS' / GUIDE's group tabs as folder tabs on the window's side (`FolderTab`), tab chips and `OptionButton`s as keys
 (`KeyColors`, `drawKey`: an edge under them, the open tab pressed in), tighter margins. Data goes in blocks of connected cells
 (`cell()` / `HeadCell` / `CellColors`, HG and Black's summary; 1.5 GBA px lines, the window round them with `margin`): battle INFO /
