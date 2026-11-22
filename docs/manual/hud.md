@@ -56,9 +56,9 @@ Tap `LAYOUT`, `LOOK` or `SIZE` to step to the next choice. The HUD changes right
 
 When PokeDaisy runs as a libretro core (the [Linux program](linux.md), plorpOS, the NXRedux collection, RetroArch), the
 HUD is drawn in the game's own pixels, and the screen shows those several times larger. So at `SMALL` and `NORMAL` it's
-drawn at about half the app's size: smaller pictures of your party and Poké Balls, small numbers, and buttons with
-their pictures but no names. `LARGE` draws it at full size, with the names on the buttons. Every `LAYOUT` works at each
-size. When your party and the rest don't fit side by side, the HUD keeps to the bottom left corner, with a `MAP` button
+drawn at about half the app's size (half of `LARGE`'s): smaller pictures of your party and Poké Balls, small numbers,
+and buttons with their pictures but no names. `LARGE` draws it at full size, with the names on the buttons. Every
+`LAYOUT` works at each size, and the HUD keeps to its corners on screen at every `ZOOM` step. When your party and the rest don't fit side by side, the HUD keeps to the bottom left corner, with a `MAP` button
 in place of the minimap.
 
 ## On iPhone and iPad
