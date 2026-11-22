@@ -557,14 +557,14 @@ fun decodeGen4PartyMon(
     if (species == 0 || species > maxSpecies) return null
     val ivWord = u32(blocks, b + 0x10)
     val flags = u8(blocks, b + 0x18)
-    // The nickname: block C's first 11 characters - the game's charmap (Gen 4), UTF-16 (Gen 5's shorter record).
+    // The nickname: block C's first 11 characters - the game's charmap (Gen 4), Gen 5's text codes (its shorter record).
     val c = block('C')
     val nickname = if (size == GEN4_MON_SIZE) Gen4Text.name(blocks, c, NICKNAME_CHARS)
         else buildString {
             for (i in 0 until NICKNAME_CHARS) {
                 val ch = u16(blocks, c + i * 2)
                 if (ch == 0xFFFF || ch == 0) break
-                append(ch.toChar())
+                append(Gen5Text.char(ch))
             }
         }
     // The party fields carry no checksum: a level or HP no Pokémon has is a read gone wrong.
