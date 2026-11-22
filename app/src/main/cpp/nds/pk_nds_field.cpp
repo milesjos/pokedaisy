@@ -1346,8 +1346,12 @@ void pk_nds_field_foreign_props(const PkNdsFieldGame* g, uint32_t (*read32)(uint
                                 int hide)
 {
     if (!hide) {
-        for (int i = 0; i < foreign.numHidden; i++)
-            if (read32(foreign.hidden[i]) == 1) write32(foreign.hidden[i], 0);
+        // Put back only what is still that prop (model 0, in use, hidden by us): a frame that freed the chunk and gave its
+        // block to something else must not get a word zeroed.
+        for (int i = 0; i < foreign.numHidden; i++) {
+            uint32_t p = foreign.hidden[i];
+            if (read32(p) == 0 && read32(p + 4) && read32(p + 8) == 1) write32(p + 8, 0);
+        }
         foreign.numHidden = 0;
         return;
     }
@@ -1387,7 +1391,7 @@ void pk_nds_field_foreign_props(const PkNdsFieldGame* g, uint32_t (*read32)(uint
             uint32_t p = pm + j * L.propStride;
             if (read32(p) == 0 && read32(p + 4) && read32(p + 8) == 0) {
                 write32(p + 8, 1);
-                foreign.hidden[foreign.numHidden++] = p + 8;
+                foreign.hidden[foreign.numHidden++] = p;
             }
         }
     }

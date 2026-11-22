@@ -14,6 +14,8 @@
 #include <algorithm>
 #include <atomic>
 #include <condition_variable>
+#include <cstdio>
+#include <cstdlib>
 #include <array>
 #include <cstring>
 #include <memory>
@@ -187,6 +189,7 @@ constexpr u16 NO_FILL = 0xFFFF;
 Wide wide;
 // The polygon being submitted is unbound ground (onSubmit -> storePolygon)
 bool fillNow = false;
+bool groundFill = false;   // Gen 4's field (pk_nds_wide_ground_fill): where the fill was tried
 
 // Engine A as it drew the frame on screen (GPU::VisibleEndHook, at line 192): the game's VBlank handler goes on to set
 // the next frame's fade, scroll, palettes and sprites before the margins are made, which ran them a frame ahead of the
@@ -552,7 +555,8 @@ inline bool unboundGround(const GPU3D& g, const Vertex* in)
 
 void onSubmit(GPU3D& g, const Vertex* in, int nverts, bool facingview, int polytype, void*)
 {
-    fillNow = unboundTexture(g) && unboundGround(g, in);
+    // Not in GPU mode (DS RESOLUTION): its list draws the middle too, which must stay the game's.
+    fillNow = groundFill && !wide.gpu && unboundTexture(g) && unboundGround(g, in);
     if (fillNow && !wide.fillReady) return;
     if (wide.gpu) {
         submitGpu(g, in, nverts, facingview, polytype);
@@ -1281,6 +1285,8 @@ void pk_nds_wide_gpu(bool on, int scale, int maxTexture)
 const WidePolygonList* pk_nds_wide_gpu_list() { return &wide.gpuList; }
 
 void pk_nds_wide_gpu_want(bool threeD) { wide.gpuWant = threeD; }
+
+void pk_nds_wide_ground_fill(bool on) { groundFill = on; }
 
 void pk_nds_wide_plan(PkNdsWidePlan* out)
 {

@@ -354,7 +354,11 @@ void pk_ndsm_run_frame(void)
     nds->GPU.SkipDraw = !draw;
     nds->GPU.SkipDrawNext = !drawNext;
     // EXPAND: another area's map chunk keeps its props to itself for the frame (pk_nds_field_foreign_props)
-    if (ds->wide) pk_nds_field_foreign_props(ds->field, mainRead32, mainWrite32, 1);
+    // Only from the field (the last frame's read): a battle or a menu app may have freed the map chunks.
+    if (ds->wide && (ds->fieldBits & PK_NDS_FIELD_SCREEN) && !(ds->fieldBits & (PK_NDS_FIELD_MENU | PK_NDS_FIELD_BATTLE)))
+        pk_nds_field_foreign_props(ds->field, mainRead32, mainWrite32, 1);
+    // ...and the margins' ground fill (pk_nds_wide.cpp), tried on HeartGold / SoulSilver and Platinum only.
+    pk_nds_wide_ground_fill(ds->field && ds->field->gen == 0);
     nds->RunFrame();
     pk_nds_field_foreign_props(ds->field, mainRead32, mainWrite32, 0);
     int fb = nds->GPU.FrontBuffer;
