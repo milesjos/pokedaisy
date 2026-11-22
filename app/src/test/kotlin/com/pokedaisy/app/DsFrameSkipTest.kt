@@ -103,6 +103,18 @@ class DsFrameSkipTest {
         assertEquals(0, s.skip)
     }
 
+    @Test fun aLongFirstGapAfterAResetIsNotFallingBehind() {
+        // A game starting or a state loading: the first frame comes 4 frames late, then the frames are heavy (a battle at
+        // 4x on a Thor) but still a DS frame apart. Nothing is skipped.
+        val s = DsFrameSkip(budget, frameNanos = frame)
+        s.run(60, drawn = 15_000_000L, skipped = 10_000_000L, rest = 500_000L)
+        s.reset()
+        clock += frame * 4
+        val drawn = s.run(300, drawn = 16_000_000L, skipped = 11_000_000L, rest = 500_000L)
+        assertTrue(drawn.all { it })
+        assertEquals(0, s.skip)
+    }
+
     @Test fun resetDrawsTheNextFrame() {
         val s = DsFrameSkip(budget, frameNanos = frame)
         s.run(300, drawn = 20_000_000L, skipped = 12_000_000L)

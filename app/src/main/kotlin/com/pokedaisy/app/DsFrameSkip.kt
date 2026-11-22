@@ -32,7 +32,9 @@ internal class DsFrameSkip(
     private var lower = 0         // frames in a row that wanted fewer skips
     private var higher = 0        // frames in a row that wanted more skips and were behind
     private var lastStart = 0L    // nanoTime the last frame's core started (0 = none since a reset)
-    private var periodAvg = 0.0   // nanos from one frame's start to the next
+    // Nanos from one frame's start to the next. Starts at a DS frame: seeded from the first gap after a start or a reset
+    // (the core's boot, a state load: up to 4 frames), it read as behind for seconds and skipped a heavy scene for nothing.
+    private var periodAvg = frameNanos.toDouble()
 
     /** Before a frame: whether it is drawn, and whether the next one will be. */
     fun plan(): Pair<Boolean, Boolean> {
@@ -47,7 +49,7 @@ internal class DsFrameSkip(
         if (lastStart != 0L) {
             // Capped: a pause (the screen off, a held transition) mustn't read as the game falling behind.
             val period = (startNanos - lastStart).coerceIn(0L, frameNanos * 4).toDouble()
-            periodAvg = if (periodAvg == 0.0) period else periodAvg + (period - periodAvg) / PERIOD_OVER
+            periodAvg += (period - periodAvg) / PERIOD_OVER
         }
         lastStart = startNanos
         if (drawn) drawnAvg = if (drawnAvg == 0.0) nanos.toDouble() else drawnAvg + (nanos - drawnAvg) / AVERAGE_OVER
@@ -79,7 +81,7 @@ internal class DsFrameSkip(
         lower = 0
         higher = 0
         lastStart = 0L
-        periodAvg = 0.0
+        periodAvg = frameNanos.toDouble()
     }
 
     private fun wanted(): Int {
