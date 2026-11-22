@@ -1447,7 +1447,7 @@ class EmulatorEngine(
             // DsFrameSkip learns from the core's own time (drawn or not), after the frame is out.
             if (dsSkipTimed) {
                 val before = dsSkip.skip
-                dsSkip.frameDone(coreEnd - coreStart, dsSkipDrawn)
+                dsSkip.frameDone(coreStart, coreEnd - coreStart, dsSkipDrawn)
                 dsSkipTimed = false
                 if (dsSkip.skip != before) Log.i("pokedaisy", "DS frame skip: $before -> ${dsSkip.skip} (${dsSkip.describe()})")
             }
