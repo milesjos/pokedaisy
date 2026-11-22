@@ -112,11 +112,9 @@ private val themedPalettes = HashMap<List<Any?>, UiStylePalette?>()
  * theme's colour, not only its greys. Cached: OptionColors asks on every colour.
  */
 fun themedStylePalette(style: UiStyle, dark: Boolean, hue: Float?): UiStylePalette? =
-    synchronized(themedPalettes) {
-        themedPalettes.getOrPut(listOf(style, dark, hue)) {
-            val base = uiStylePalette(style, dark)
-            if (base == null || hue == null || style != UiStyle.SUMMARY_MINT) base else base.rehued(RETRO_FAMILY, hue)
-        }
+    themedPalettes.getOrPut(listOf(style, dark, hue)) {
+        val base = uiStylePalette(style, dark)
+        if (base == null || hue == null || style != UiStyle.SUMMARY_MINT) base else base.rehued(RETRO_FAMILY, hue)
     }
 
 private fun UiStylePalette.rehued(from: ClosedFloatingPointRange<Float>, to: Float, calmed: Boolean = true): UiStylePalette {
