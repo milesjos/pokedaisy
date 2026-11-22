@@ -617,7 +617,10 @@ void pk_ndsb_run_frame(void)
     u32 t = touch.load();
     if (t & 0x80000000u) nds->TouchScreen((u16) ((t >> 8) & 0xFF), (u16) (t & 0xFF));
     else nds->ReleaseScreen();
+    // EXPAND: another area's map chunk keeps its props to itself for the frame (pk_nds_field_foreign_props)
+    if (ds->wide) pk_nds_field_foreign_props(ds->field, mainRead32, mainWrite32, 1);
     nds->RunFrame();
+    pk_nds_field_foreign_props(ds->field, mainRead32, mainWrite32, 0);
     // Every frame is drawn (BananaDS's melonDS has no draw skip); a frame fast-forward won't show isn't copied out.
     ds->drawn = show;
     ds->presented = false;

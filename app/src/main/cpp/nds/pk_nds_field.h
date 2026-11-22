@@ -189,6 +189,13 @@ int pk_nds_field_state(const PkNdsFieldGame* game, uint32_t (*read32)(uint32_t a
  * screen's closing fade. */
 void pk_nds_field_keep_start_menu(const PkNdsFieldGame* g, uint32_t (*read32)(uint32_t), void (*write32)(uint32_t, uint32_t));
 
+/** EXPAND in HeartGold / SoulSilver and Platinum: before a frame ([hide] 1), the props of a loaded map chunk in another
+ * area than the player's that the game made model 0 (their model isn't this area's: a box only EXPAND's margins show)
+ * are marked culled (Platinum: hidden); after it ([hide] 0), they are put back, so a state between frames never keeps
+ * them. */
+void pk_nds_field_foreign_props(const PkNdsFieldGame* g, uint32_t (*read32)(uint32_t), void (*write32)(uint32_t, uint32_t),
+                                int hide);
+
 #ifdef __cplusplus
 }
 #endif
