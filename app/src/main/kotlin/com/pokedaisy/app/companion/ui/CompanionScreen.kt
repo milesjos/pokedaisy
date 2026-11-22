@@ -70,6 +70,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.pokedaisy.app.companion.data.BATTLE_INPUT_ACTION_SELECT
+import com.pokedaisy.app.companion.data.BATTLE_INPUT_BUSY
 import com.pokedaisy.app.companion.data.BATTLE_INPUT_BAG_OPEN
 import com.pokedaisy.app.companion.data.BATTLE_INPUT_MOVE_SELECT
 import com.pokedaisy.app.companion.data.BATTLE_INPUT_PARTY_OPEN
@@ -371,7 +372,20 @@ fun CompanionScreen(
         // now via touch - the action/move menus, or the Bag/Party screen
         // that was opened from them (so BACK stays reachable) - not the
         // busy/animation/opponent's-turn states in between.
-        val isMyTurn = when (snapshot.battleInputState) {
+        // A Game Boy game's menu counts only while its ▶ is drawn, and Crystal takes it off for a few frames on every cursor
+        // move (the move screen redraws its TYPE box): the menu read is held through such a gap, so the pane doesn't flash
+        // to INFO and back on each step. A real pick stays busy past the hold.
+        var inputState by remember { mutableStateOf(snapshot.battleInputState) }
+        val waitsForPlayer = { s: Int ->
+            s == BATTLE_INPUT_ACTION_SELECT || s == BATTLE_INPUT_MOVE_SELECT || s == BATTLE_INPUT_BAG_OPEN ||
+                s == BATTLE_INPUT_PARTY_OPEN || s == BATTLE_INPUT_TARGET_SELECT
+        }
+        LaunchedEffect(snapshot.battleInputState, battle) {
+            val s = snapshot.battleInputState
+            if (battle && game.isGameBoyGame && s == BATTLE_INPUT_BUSY && waitsForPlayer(inputState)) delay(GB_MENU_GAP_MS)
+            inputState = s
+        }
+        val isMyTurn = when (inputState) {
             BATTLE_INPUT_ACTION_SELECT, BATTLE_INPUT_MOVE_SELECT,
             BATTLE_INPUT_BAG_OPEN, BATTLE_INPUT_PARTY_OPEN, BATTLE_INPUT_TARGET_SELECT -> true
             else -> false
@@ -850,7 +864,7 @@ fun CompanionScreen(
                                         activeMon = snapshot.battlePlayer.getOrNull(0),
                                         party = snapshot.party,
                                         battleInput = battleInput,
-                                        battleInputState = snapshot.battleInputState,
+                                        battleInputState = inputState,
                                         // GEN 5's go edge to edge, over the tab area's margin.
                                         modifier = if (settings?.battleStyle == com.pokedaisy.app.companion.BattleStyle.GEN5 && !gen1Buttons)
                                             Modifier.bleed(margin, if (nothingAbove) margin else 0.dp) else Modifier.fillMaxSize(),
@@ -1099,6 +1113,9 @@ val LocalShoulderHints = androidx.compose.runtime.staticCompositionLocalOf { fal
 /** The companion's height in GBA pixels (rememberGbaTextMetrics' unit) below which its main text goes a step smaller: the
  * RG DS's 480 px are 240, the Thor's 1080 px 360, the Duo Lite's 960 px 320. */
 private const val SHORT_COMPANION_UNITS = 316
+
+/** How long a Game Boy battle menu read is held through a busy read (the ▶ off while the game redraws). */
+private const val GB_MENU_GAP_MS = 500L
 
 /** The companion is on a short screen ([isShortCompanion]): its text a step smaller, its fixed-size buttons smaller too
  * ([NavButtonSize], [SETTINGS_CHIP_WIDTH]). */
