@@ -1895,7 +1895,8 @@ class PokeDaisyActivity : Activity() {
             if (on) com.pokedaisy.app.companion.FeatureTips.used(TipId.REUSABLE_TMS)
             stored.setReusableTms(on)
             if (::engine.isInitialized) engine.setReusableTms(tmSites, on)
-            if (::engine.isInitialized) engine.dsReusableTms = on && dsInstantTextWorks()
+            // Origin HeartGold's TMs never run out by themselves: no patch where the row reads ON, greyed.
+            if (::engine.isInitialized) engine.dsReusableTms = on && dsInstantTextWorks() && !com.pokedaisy.app.companion.data.ReusableTms.builtIn
         }
         override val reusableTmsSupported get() = tmSites.isNotEmpty() || dsInstantTextWorks()
         override fun setInstantText(on: Boolean) {
@@ -3102,7 +3103,7 @@ class PokeDaisyActivity : Activity() {
         e.setReusableTms(tmSites, p.reusableTms)
         e.setInstantText(textPatch, p.instantText)
         e.dsInstantText = p.instantText && dsInstantTextWorks()
-        e.dsReusableTms = p.reusableTms && dsInstantTextWorks()
+        e.dsReusableTms = p.reusableTms && dsInstantTextWorks() && !com.pokedaisy.app.companion.data.ReusableTms.builtIn
         e.setHmFree(hmPatch, p.hmFree)
         e.setExpShare(expShareFound, if (expShareFound != null) com.pokedaisy.app.companion.data.ExpShare.Mode.of(p.expShare) else com.pokedaisy.app.companion.data.ExpShare.Mode.OFF)
         e.setLevelCap(levelCapFound, if (levelCapFound != null && p.levelCap) levelCapNow?.level ?: 0 else 0)
