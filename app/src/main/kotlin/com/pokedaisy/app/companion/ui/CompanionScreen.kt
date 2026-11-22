@@ -165,14 +165,22 @@ fun CompanionScreen(
     // RUN picked here: the battle pane keeps the controls until the battle ends (or the escape fails and the menu is back),
     // instead of INFO / SUGGESTIONS showing for the moment "Got away safely!" takes (the user's report).
     var ranAway by remember { mutableStateOf(false) }
+    // A Game Boy menu read held through a busy one (below): the buttons stay up, but the game may already be playing the
+    // pick, so taps meanwhile are dropped (a second one would be steered into the turn's text or the next menu).
+    var tapsHeld by remember { mutableStateOf(false) }
     @Suppress("NAME_SHADOWING")
     val battleInput = remember(battleInput) {
         battleInput?.let { b ->
             object : com.pokedaisy.app.companion.BattleInput by b {
                 override fun selectAction(actionIndex: Int) {
+                    if (tapsHeld) return
                     if (actionIndex == 3) ranAway = true
                     b.selectAction(actionIndex)
                 }
+                override fun selectMove(moveIndex: Int) { if (!tapsHeld) b.selectMove(moveIndex) }
+                override fun back() { if (!tapsHeld) b.back() }
+                override fun throwBall() { if (!tapsHeld) b.throwBall() }
+                override fun switchTo(personality: Long) { if (!tapsHeld) b.switchTo(personality) }
             }
         }
     }
@@ -382,7 +390,10 @@ fun CompanionScreen(
         }
         LaunchedEffect(snapshot.battleInputState, battle) {
             val s = snapshot.battleInputState
-            if (battle && game.isGameBoyGame && s == BATTLE_INPUT_BUSY && waitsForPlayer(inputState)) delay(GB_MENU_GAP_MS)
+            if (battle && game.isGameBoyGame && s == BATTLE_INPUT_BUSY && waitsForPlayer(inputState)) {
+                tapsHeld = true
+                try { delay(GB_MENU_GAP_MS) } finally { tapsHeld = false }
+            }
             inputState = s
         }
         val isMyTurn = when (inputState) {
