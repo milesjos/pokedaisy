@@ -315,7 +315,7 @@ void addPolygon(GPU3D& g, Slice& s, Vertex* cv, int nverts, bool facingview, int
 
 // Unbound ground in the colour of the ground beside it: the edge band of the screen nearest the polygon's middle (its
 // side, its rows), flat, the material's toon / highlight mode dropped (it would look the colour up in the toon table).
-void fillGround(const Store& st, Polygon* poly)
+void fillGround(const Store& st, melonDS::Polygon* poly)
 {
     s64 sx = 0, sy = 0;
     for (u32 i = 0; i < poly->NumVertices; i++) {
