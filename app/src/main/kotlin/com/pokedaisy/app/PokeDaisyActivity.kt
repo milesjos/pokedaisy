@@ -1664,7 +1664,9 @@ class PokeDaisyActivity : Activity() {
                 if (flyer == null || flyer.first != targets.flyerSlot || flyer.second != targets.flyerPersonality) {
                     return done(com.pokedaisy.app.companion.data.FlyResult.NO_FLYER)
                 }
+                // The flight is the game's to show: the window goes, and the HUD's map panel it may come from.
                 closeCompanionWindow()
+                hudCloseTick.intValue++
                 // The job's result 1 is the flight's event: none when the game's own check said no (walked indoors since).
                 var refused = false
                 dsAction(MgbaCore.NDS_ACTION_FLY, intArrayOf(flyer.first, spot.mapHeader, 0, 0), ran = { res ->
@@ -1691,6 +1693,7 @@ class PokeDaisyActivity : Activity() {
                     return done(com.pokedaisy.app.companion.data.FlyResult.NO_FLYER)
                 }
                 closeCompanionWindow()
+                hudCloseTick.intValue++
                 dsAction(MgbaCore.NDS_ACTION_FLY, intArrayOf(flyer.first, spot.mapHeader, spot.x, spot.z)) { o ->
                     done(when (o.result) {
                         com.pokedaisy.app.companion.data.ItemUseResult.USED -> com.pokedaisy.app.companion.data.FlyResult.OK
