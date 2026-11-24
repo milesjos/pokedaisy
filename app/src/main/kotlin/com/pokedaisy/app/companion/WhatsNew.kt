@@ -38,7 +38,7 @@ object WhatsNew {
     /** Newest first. */
     val RELEASES: List<Notes> by lazy {
         listOf(
-            NOTES_1_6_2,
+            hotfix("1.6.2.1", NOTES_1_6_2, "1.6.2.1 HOTFIX: games open again on the Anbernic RG Rotate instead of closing at once."),
             NOTES_1_6_1,
             NOTES_1_6_0,
             hotfix("1.5.0.1", NOTES_1_5_0, "1.5.0.1 HOTFIX: turning a Samsung Galaxy sideways no longer closes the game."),
