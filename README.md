@@ -122,18 +122,21 @@ Everything is explained in the [manual](https://pokedaisy.com/docs/).
 
 ## Devices
 
-| Device                     | Status                                                         |
-| -------------------------- | -------------------------------------------------------------- |
-| AYN Thor                   | Tested, made for it                                            |
-| Retroid Pocket Duo Lite    | Supported, with its own 4:3 layout                             |
-| Retroid Pocket Duo         | Should work, not yet tested on real hardware                   |
-| Anbernic RG DS             | Should work, not yet tested on real hardware                   |
-| Retroid Pocket 6           | Single screen: tested                                          |
-| Other one-screen handhelds | Should work, held sideways like the Pocket 6                   |
-| Android phones (portrait)  | Should work, checked in screenshots only                       |
-| A phone cast to a TV       | Should work: the game on the TV, the companion on the phone    |
+| Device                     | Status                                                              |
+| -------------------------- | ------------------------------------------------------------------- |
+| AYN Thor                   | Tested, made for it                                                 |
+| Retroid Pocket Duo Lite    | Supported, with its own 4:3 layout                                  |
+| Retroid Pocket Duo         | Works, played on by players                                         |
+| AYANEO Pocket DS           | Works since v1.5.0, checked by players                              |
+| Anbernic RG DS             | Works with SWAP SCREENS on; DS games are heavy for its chip         |
+| Retroid Pocket 6           | Single screen: tested                                               |
+| Other one-screen handhelds | Work held sideways like the Pocket 6 (players use the Retroid Pocket 5 and AYN Odin 2 / 3) |
+| Android phones             | Tested on a Samsung Galaxy S9, upright or sideways                  |
+| Tablets                    | Tested on a Samsung Galaxy Tab A                                    |
+| Folding phones             | Should work with FOLD LAYOUT, not yet tried by us                   |
+| A phone cast to a TV       | Should work: the game on the TV, the companion on the phone         |
 
-Any Android 8.0+ device runs the games.
+Any Android 8.0+ device runs the games. PokeDaisy also runs on Linux (Steam Deck and Linux handhelds), Windows and the Nintendo 3DS: see below.
 
 ## Download and install
 
