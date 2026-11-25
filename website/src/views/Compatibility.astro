@@ -44,7 +44,7 @@ const tr = trFor(Astro.url);
       <p class="lead">{tr('ROM hacks are recognised by the whole file\'s SHA-1, so another version of the same hack needs its own support.')}</p>
     </div>
     <div class="versions">
-      <article class="f-card vcard" data-reveal>
+      <article class="f-cardShadow vcard" data-reveal>
         <h3 class="vtitle">{tr('ROM HACKS')}</h3>
         <ul class="vlist">
           {hacks.map((h) => (
@@ -52,7 +52,7 @@ const tr = trFor(Astro.url);
           ))}
         </ul>
       </article>
-      <article class="f-card vcard" data-reveal style="--i:1">
+      <article class="f-cardShadow vcard" data-reveal style="--i:1">
         <h3 class="vtitle">{tr('ORIGINAL GAMES')}</h3>
         <p class="small muted">{tr('Retail dumps.')}</p>
         <ul class="vlist">
@@ -70,7 +70,7 @@ const tr = trFor(Astro.url);
 <style>
   .narrow { max-width: 900px; }
   .versions { display: grid; grid-template-columns: 1fr 1.2fr; gap: 28px; align-items: start; }
-  .vcard { filter: var(--hard-shadow); display: grid; gap: 12px; padding: calc(var(--px) * 8); }
+  .vcard { display: grid; gap: 12px; padding: calc(var(--px) * 8); }
   .vtitle { font-size: var(--t-l); color: var(--red); letter-spacing: 0.0625em; text-shadow: var(--bold); }
   .vlist { list-style: none; margin: 0; padding: 0; font-family: var(--font-pixel); font-size: var(--t-s); }
   .vlist li { display: flex; justify-content: space-between; gap: 16px; padding: 6px 4px; border-top: var(--px) solid var(--line); }
