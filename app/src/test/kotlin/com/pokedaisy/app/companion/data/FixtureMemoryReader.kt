@@ -1,5 +1,7 @@
 package com.pokedaisy.app.companion.data
 
+import org.junit.Assume
+
 /**
  * Replays a captured real-device EWRAM+IWRAM snapshot (see
  * scripts/capture_fixture.sh, which writes app/src/test/resources/fixtures/<key>/
@@ -42,16 +44,44 @@ class FixtureMemoryReader private constructor(
         private const val EWRAM_BASE = 0x02000000L
         private const val IWRAM_BASE = 0x03000000L
 
-        /** [key] must match a directory under app/src/test/resources/fixtures/
-         * (and a line in scripts/roms.conf - that's where it came from). */
-        /** A dump outside the fixtures: [dir]/ewram.bin + iwram.bin (scripts/verify_ports.py's). */
-        fun fromDir(dir: java.io.File): FixtureMemoryReader =
-            FixtureMemoryReader(java.io.File(dir, "ewram.bin").readBytes(), java.io.File(dir, "iwram.bin").readBytes())
+        /** One raw file under fixtures/ (e.g. "platinum/mainram.bin"); the test skips when it isn't there. */
+        fun bytes(path: String): ByteArray {
+            val stream = FixtureMemoryReader::class.java.classLoader.getResourceAsStream("fixtures/$path")
+            Assume.assumeTrue("no fixture fixtures/$path - see test-fixtures/README.md", stream != null)
+            return stream!!.use { it.readBytes() }
+        }
 
+        /** A fixture directory (e.g. "pbr_battle"); the test skips when it isn't there. */
+        fun dir(path: String): java.io.File {
+            val url = FixtureMemoryReader::class.java.classLoader.getResource("fixtures/$path")
+            Assume.assumeTrue("no fixture fixtures/$path - see test-fixtures/README.md", url != null)
+            return java.io.File(url!!.toURI())
+        }
+
+        /** The fixture directories present (empty without fixtures). */
+        fun keys(): List<String> =
+            FixtureMemoryReader::class.java.classLoader.getResource("fixtures")?.let { java.io.File(it.toURI()).list()?.toList() } ?: emptyList()
+
+        /** A dump outside the fixtures: [dir]/ewram.bin + iwram.bin (scripts/verify_ports.py's); skips when absent. */
+        fun fromDir(dir: java.io.File): FixtureMemoryReader {
+            for (name in listOf("ewram.bin", "iwram.bin")) {
+                Assume.assumeTrue("no dump $dir/$name (needs your own ROM)", java.io.File(dir, name).isFile)
+            }
+            return FixtureMemoryReader(java.io.File(dir, "ewram.bin").readBytes(), java.io.File(dir, "iwram.bin").readBytes())
+        }
+
+        /** [key] must match a directory under app/src/test/resources/fixtures/
+         * (and a line in scripts/roms.conf - that's where it came from); the test skips when it isn't there. */
         fun load(key: String): FixtureMemoryReader {
             fun stream(name: String) = FixtureMemoryReader::class.java.classLoader.getResourceAsStream("fixtures/$key/$name")
+            // The RAM dumps are not in the repo (they come from commercial ROMs): without them the test skips.
+            // Capture your own with scripts/capture_fixture.sh <key>; see test-fixtures/README.md.
             fun read(name: String): ByteArray = stream(name)?.use { it.readBytes() }
-                ?: error("missing test fixture fixtures/$key/$name - run scripts/capture_fixture.sh $key first")
+                ?: error("fixture fixtures/$key has no $name")
+            Assume.assumeTrue(
+                "no fixture fixtures/$key - run scripts/capture_fixture.sh $key (see test-fixtures/README.md)",
+                listOf("mainram.bin", "wram.bin", "ewram.bin").any { stream(it) != null },
+            )
             if (stream("mainram.bin") != null) {
                 // A DS game's main RAM (nds_dump's dump: 4 MB at 0x02000000, where Gen4Reader reads it).
                 return FixtureMemoryReader(read("mainram.bin"), ByteArray(0))

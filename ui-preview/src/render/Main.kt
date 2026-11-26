@@ -744,7 +744,10 @@ class RomFile(private val rom: ByteArray) : MemoryReader {
     }
 }
 
-/** Serves RAM reads from a save fixture's ewram.bin / iwram.bin (app/src/test/resources/fixtures). */
+// Preview render tasks run from app/src/main/assets. The fixtures are your own captures (test-fixtures/README.md).
+private val ramFixtures = File("../../test/resources/fixtures")
+
+/** Serves RAM reads from a save fixture's ewram.bin / iwram.bin. */
 class RamFixture(dir: File) : MemoryReader {
     private val ewram = File(dir, "ewram.bin").readBytes()
     private val iwram = File(dir, "iwram.bin").readBytes()

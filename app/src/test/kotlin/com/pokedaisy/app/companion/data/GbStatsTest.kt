@@ -197,7 +197,7 @@ class GbStatsTest {
 
     /** The English fixtures of one game: `<prefix>`, `<prefix>_battle*`, `<prefix>_trainer` (not the other languages' or the hacks'). */
     private fun fixtures(prefix: String): List<String> =
-        File(javaClass.classLoader!!.getResource("fixtures")!!.toURI()).list()!!.filter {
+        FixtureMemoryReader.keys().filter {
             it == prefix || it.startsWith("${prefix}_battle") || it == "${prefix}_trainer" || it == "${prefix}_rev0" || it == "${prefix}_au"
         }.sorted()
 

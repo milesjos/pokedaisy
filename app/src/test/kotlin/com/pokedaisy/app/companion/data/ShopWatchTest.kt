@@ -7,7 +7,7 @@ import org.junit.Test
 
 /** SMART fast-forward's shop exception ([ShopWatch], GitHub #41), on headless captures of a Poké Mart clerk. */
 class ShopWatchTest {
-    private fun iwram(name: String) = javaClass.classLoader!!.getResourceAsStream("fixtures/ff_shop/$name.bin")!!.readBytes()
+    private fun iwram(name: String) = FixtureMemoryReader.bytes("ff_shop/$name.bin")
 
     /** An IWRAM capture plus the few ROM bytes the watch reads: the clerk's `pokemart` command. */
     private class Capture(private val iwram: ByteArray, private val rom: Map<Long, ByteArray>) : MemoryReader {

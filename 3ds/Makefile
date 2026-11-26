@@ -10,6 +10,9 @@
 
 REPO := $(abspath ..)
 FIXTURES := $(REPO)/app/src/test/resources/fixtures
+# The RAM fixtures are not in the repo (they come from commercial ROMs; see test-fixtures/README.md): the targets
+# CI runs (preview, test-scroll) skip without them. The other fixture targets (test-gbdex, test-shiny, ...) need them.
+HAVE_FIXTURES := $(wildcard $(FIXTURES)/firered_vanilla/ewram.bin)
 BUILD := build
 CC ?= cc
 CFLAGS ?= -std=c11 -O2 -Wall -Wextra -Werror
@@ -154,6 +157,10 @@ gb_preview = $(if $(wildcard $(GB_ROMS)/$(2)),$(BUILD)/pd_preview $(FIXTURES)/$(
 # release), and every such picture must equal a whole redraw pixel for pixel: DEX, BAG, GUIDE, SETTINGS and MAP's PLACES, small and
 # normal font, a field and a battle fixture. A mismatch's pictures go to build/scroll-shots/.
 scroll_check = PD_PREVIEW_DEX_ONLY=1 PD_PREVIEW_SCROLL_CHECK=1 $(1) $(BUILD)/pd_preview $(FIXTURES)/$(2) $(3) $(BUILD)/scroll-shots $(2) $(call rom_if,$(4))
+ifeq ($(HAVE_FIXTURES),)
+test-scroll preview:
+	@echo "$@: no RAM fixtures in $(FIXTURES) (see test-fixtures/README.md), skipped"
+else
 test-scroll: $(BUILD)/pd_preview
 	@mkdir -p $(BUILD)/scroll-shots
 	$(call scroll_check,,firered_vanilla,BPRE,$(FR_ROM))
@@ -179,6 +186,7 @@ preview: $(BUILD)/pd_preview
 	$(call gb_preview,crystal,crystal.gbc)
 	$(call gb_preview,gold,gold.gbc)
 	$(call gb_preview,silver,silver.gbc)
+endif
 
 decomps:
 	test/build_decomps.sh

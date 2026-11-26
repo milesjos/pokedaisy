@@ -76,6 +76,7 @@ clean: ## gradle clean
 
 check: ## Everything a PR must pass: unit tests, translations, game data, ui-preview stress + docs search, docs, debug build
 	python3 scripts/check_translations.py
+	python3 scripts/check_no_fixtures.py
 	python3 scripts/gen_gamedata.py --check
 	python3 scripts/gen_nds_ports.py --check
 	python3 scripts/gen_area_maps.py --check

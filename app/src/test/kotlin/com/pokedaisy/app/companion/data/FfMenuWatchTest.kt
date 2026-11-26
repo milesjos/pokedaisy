@@ -7,7 +7,7 @@ import org.junit.Test
 
 /** SMART fast-forward's menu detection ([FfMenuWatch]). */
 class FfMenuWatchTest {
-    private fun iwram(name: String) = javaClass.classLoader!!.getResourceAsStream("fixtures/ff_menu_gmain/$name.bin")!!.readBytes()
+    private fun iwram(name: String) = FixtureMemoryReader.bytes("ff_menu_gmain/$name.bin")
 
     @Test fun findsGMainInEveryGame() {
         // Emerald and Rogue count vblankCounter1; FireRed keeps a pointer there and counts counter2.

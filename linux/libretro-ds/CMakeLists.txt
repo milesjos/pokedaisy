@@ -124,7 +124,17 @@ if(BUILD_TESTING)
   target_include_directories(ds-battle-strip-test PRIVATE .)
   target_compile_options(ds-battle-strip-test PRIVATE -UNDEBUG)
   target_link_libraries(ds-battle-strip-test PRIVATE pd_ds_presentation)
-  add_test(NAME ds-platinum-battle-strip COMMAND ds-battle-strip-test
+  # The RAM fixtures come from commercial ROMs and are not in the repo (test-fixtures/README.md): these tests skip without them.
+  function(pd_add_fixture_test name)
+    foreach(arg ${ARGN})
+      if(arg MATCHES "mainram\\.bin$" AND NOT EXISTS "${arg}")
+        message(STATUS "${name}: skipped, no RAM fixtures")
+        return()
+      endif()
+    endforeach()
+    add_test(NAME ${name} COMMAND ${ARGN})
+  endfunction()
+  pd_add_fixture_test(ds-platinum-battle-strip ds-battle-strip-test
     ${ROOT}/app/src/test/resources/fixtures/platinum_battle/mainram.bin
     ${ROOT}/app/src/test/resources/fixtures/black_wild/mainram.bin)
   add_executable(ds-settings-test test/settings.cpp)
@@ -139,10 +149,10 @@ if(BUILD_TESTING)
   if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 9)
     target_link_libraries(ds-settings-test PRIVATE stdc++fs)
   endif()
-  add_test(NAME ds-settings COMMAND ds-settings-test ${ROOT}/app/src/test/resources/fixtures/platinum/mainram.bin ${CMAKE_CURRENT_BINARY_DIR}/validation)
-  add_test(NAME ds-companion-fixture COMMAND ds-companion-fixture ${ROOT}/app/src/test/resources/fixtures/platinum/mainram.bin)
+  pd_add_fixture_test(ds-settings ds-settings-test ${ROOT}/app/src/test/resources/fixtures/platinum/mainram.bin ${CMAKE_CURRENT_BINARY_DIR}/validation)
+  pd_add_fixture_test(ds-companion-fixture ds-companion-fixture ${ROOT}/app/src/test/resources/fixtures/platinum/mainram.bin)
   set(DS_FIXTURES ${ROOT}/app/src/test/resources/fixtures)
-  add_test(NAME ds-companion-parity COMMAND ds-companion-parity
+  pd_add_fixture_test(ds-companion-parity ds-companion-parity
     ${DS_FIXTURES}/heartgold/mainram.bin ${DS_FIXTURES}/soulsilver/mainram.bin ${DS_FIXTURES}/black/mainram.bin
     ${DS_FIXTURES}/white/mainram.bin ${DS_FIXTURES}/black2/mainram.bin ${DS_FIXTURES}/white2/mainram.bin)
 endif()

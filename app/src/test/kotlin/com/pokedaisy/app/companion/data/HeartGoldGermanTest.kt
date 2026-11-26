@@ -159,7 +159,7 @@ class HeartGoldGermanTest {
     fun `Repels write only the German save and refuse a busy field or an active Repel`() {
         for ((fixture, cfg) in listOf("heartgold" to GEN4_HEARTGOLD_DE, "soulsilver" to GEN4_SOULSILVER_DE)) {
             for ((item, duration) in GEN4_REPEL_KINDS) {
-                val main = javaClass.classLoader!!.getResourceAsStream("fixtures/$fixture/mainram.bin")!!.readBytes()
+                val main = FixtureMemoryReader.bytes("$fixture/mainram.bin")
                 fun offset(addr: Long) = (addr - 0x02000000L).toInt()
                 val usCfg = if (fixture == "heartgold") GEN4_HEARTGOLD_US else GEN4_SOULSILVER_US
                 val ptrBytes = main.copyOfRange(offset(usCfg.saveDataPtr), offset(usCfg.saveDataPtr) + 4)

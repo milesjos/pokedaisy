@@ -74,3 +74,7 @@ __pycache__/
 
 # ROM lists for make rom-support LIST=... (scripts/rom_agent/): local paths, never committed
 roms-to-add*.txt
+
+# RAM dumps captured from commercial ROMs: never committed (test-fixtures/README.md)
+/test-fixtures/resources/fixtures/
+/app/src/test/resources/fixtures/

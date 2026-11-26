@@ -51,8 +51,8 @@ class PlatinumDecodeTest {
 
 /** A party Pokémon the game holds decrypted in RAM (its flags say so) reads the same as the encrypted one. */
 class PlatinumDecryptedMonTest {
-    private val main = javaClass.classLoader!!.getResourceAsStream("fixtures/platinum/mainram.bin")!!.readBytes()
-    private val turtwig = (0x0227E178 + GEN4_PLATINUM_US.partyOff + 8 - 0x02000000).let { main.copyOfRange(it, it + 0xEC) }
+    private val main by lazy { FixtureMemoryReader.bytes("platinum/mainram.bin") }
+    private val turtwig by lazy { (0x0227E178 + GEN4_PLATINUM_US.partyOff + 8 - 0x02000000).let { main.copyOfRange(it, it + 0xEC) } }
 
     private fun u16(b: ByteArray, o: Int) = (b[o].toInt() and 0xFF) or ((b[o + 1].toInt() and 0xFF) shl 8)
 
@@ -81,7 +81,7 @@ class PlatinumDecryptedMonTest {
 
 /** Platinum's Repel, used the way its bag does (useGen4Repel), on the platinum fixture's RAM. */
 class PlatinumRepelTest {
-    private val main = javaClass.classLoader!!.getResourceAsStream("fixtures/platinum/mainram.bin")!!.readBytes()
+    private val main by lazy { FixtureMemoryReader.bytes("platinum/mainram.bin") }
     private val calls = object : GameCalls {
         override fun call(fn: Long, a0: Int, a1: Int, a2: Int, a3: Int) = -1L
         override fun read(addr: Long, len: Int) = main.copyOfRange((addr - 0x02000000L).toInt(), (addr - 0x02000000L).toInt() + len)
