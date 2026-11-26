@@ -19,6 +19,8 @@ PokeDaisy isn't on the Play Store. You install it from [its website](https://pok
 > [!NOTE]
 > PokeDaisy comes with no games. You'll need your own ROMs, dumped from cartridges you own.
 
+
+If you keep your apps in Obtainium, it can install PokeDaisy and keep it up to date instead: see [Install and update with Obtainium](obtainium.md).
 ## First-time setup
 
 The first time you open PokeDaisy with an empty library, it shows `WELCOME TO POKéDAISY`: five short steps, numbered `1 / 5` to `5 / 5` in the corner. Every step is optional. The button at the bottom right says `SKIP` until you've chosen something, then `NEXT`, and `DONE` on the last step. `BACK` goes to the previous step.

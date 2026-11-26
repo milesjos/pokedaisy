@@ -46,7 +46,14 @@ const soon = platforms.filter((p) => p.soon);
             </li>
           ))}
         </ul>
-        <a class="dl-guide small" href={guide(p)}><Pixel name="guide" scale={0.5} /> {tr('HOW TO INSTALL')}</a>
+        <div class="dl-links">
+          <a class="dl-guide small" href={guide(p)}><Pixel name="guide" scale={0.5} /> {tr('HOW TO INSTALL')}</a>
+          {p.id === 'android' && (
+            <a class="dl-guide small" href="/obtainium" title={tr('Installs PokeDaisy through Obtainium, which keeps it up to date.')}>
+              <Pixel name="download" scale={0.5} /> {tr('ADD TO OBTAINIUM')}
+            </a>
+          )}
+        </div>
       </article>
     ))}
   </div>
@@ -85,6 +92,7 @@ const soon = platforms.filter((p) => p.soon);
   a.dl-file:hover .dl-label { color: var(--red); }
   .dl-guide { display: inline-flex; align-items: center; gap: 8px; font-size: var(--t-s); color: var(--blue, #3d6fe0); text-decoration: none; letter-spacing: 0.0625em; justify-self: start; }
   .dl-guide:hover { text-decoration: underline; }
+  .dl-links { display: flex; flex-wrap: wrap; gap: 6px 18px; }
   .dl-soon { display: flex; flex-wrap: wrap; justify-content: center; gap: 16px 40px; }
   .dl-soon-item { display: inline-flex; align-items: center; gap: 12px; color: var(--muted); }
   @media (max-width: 1080px) {

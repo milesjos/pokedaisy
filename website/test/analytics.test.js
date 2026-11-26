@@ -71,3 +71,15 @@ test('a hit carries the visit and the event, nothing else', () => {
   assert.equal(later.searchParams.get('_s'), '2');
   assert.equal(later.searchParams.has('_fv'), false);
 });
+
+test('the /obtainium redirect is the Obtainium link links.js builds', async () => {
+  const { OBTAINIUM_URL, OBTAINIUM_DEEP_LINK } = await import('../src/lib/links.js');
+  const { readFileSync } = await import('node:fs');
+  const hosting = JSON.parse(readFileSync(new URL('../firebase.json', import.meta.url), 'utf8')).hosting;
+  assert.equal(hosting.redirects.find((r) => r.source === '/obtainium')?.destination, OBTAINIUM_URL);
+  const app = JSON.parse(decodeURIComponent(OBTAINIUM_DEEP_LINK.slice('obtainium://app/'.length)));
+  assert.equal(app.id, 'com.pokedaisy.app');
+  assert.equal(app.overrideSource, 'HTML');
+  const settings = JSON.parse(app.additionalSettings);
+  assert.equal(new RegExp(settings.versionExtractionRegEx).exec('/dl/v1.6.2.2/PokeDaisy-1.6.2.2.apk')[1], '1.6.2.2');
+});

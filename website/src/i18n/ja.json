@@ -394,5 +394,7 @@
   "Bug reports and game requests help just as much:": "バグの報告とゲームのリクエストも同じくらい助けになります：",
   "CONTACT": "お問い合わせ",
   "LEGAL": "権利について",
-  "Scan it in FBI (Remote Install > Scan QR Code) to install the .cia on the HOME Menu.": "FBIでスキャンすると（Remote Install > Scan QR Code）、.ciaをHOMEメニューに入れられます。"
+  "Scan it in FBI (Remote Install > Scan QR Code) to install the .cia on the HOME Menu.": "FBIでスキャンすると（Remote Install > Scan QR Code）、.ciaをHOMEメニューに入れられます。",
+  "ADD TO OBTAINIUM": "OBTAINIUMに追加",
+  "Installs PokeDaisy through Obtainium, which keeps it up to date.": "Obtainiumを通してPokeDaisyを入れ、最新に保ちます。"
 }
