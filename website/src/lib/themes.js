@@ -2,7 +2,7 @@
 // pixel frames and backdrop redrawn in a game's colours, all scoped under `html[data-theme=<id>]` so nothing
 // leaks into other pages. Colours come from the game itself (sampled from its title screen, headless), never
 // from its art: the pages still draw only our own pixels.
-import { frameSvg } from './pixel.js';
+import { frameRule, frameSvg, HARD_SHADOW } from './pixel.js';
 
 /** Pixel stars on a 120 px tile, for a night sky: [x, y, size, colour]. */
 function starTile(stars) {
@@ -35,6 +35,7 @@ const DARK_PILLS = {
 function make(o) {
   const dark = !!o.dark;
   const shade = o.shade ?? (dark ? '#000000' : o.ink);
+  const hardShadow = o.hardShadow ?? (dark ? 'rgba(0, 0, 0, 0.55)' : HARD_SHADOW);
   return {
     themeColor: o.themeColor ?? o.bg,
     tokens: {
@@ -47,7 +48,7 @@ function make(o) {
       '--red-ink': o.accentInk ?? o.accent,
       '--yellow': o.yellow ?? '#f8d030',
       ...(dark ? { '--blue': o.blue ?? '#8aa8ff', '--green': o.green ?? '#5fd47a' } : {}),
-      '--hard-shadow': `drop-shadow(calc(var(--px) * 2) calc(var(--px) * 2) 0 ${o.hardShadow ?? (dark ? 'rgba(0, 0, 0, 0.55)' : 'rgba(29, 27, 38, 0.14)')})`,
+      '--hard-shadow': `drop-shadow(calc(var(--px) * 2) calc(var(--px) * 2) 0 ${hardShadow})`,
       '--shade': shade,
       // Surfaces the pages draw without a frame: a card's own fill, a tint behind code / table heads, a row's
       // hover, a hairline.
@@ -58,6 +59,7 @@ function make(o) {
     },
     frames: {
       card: frameSvg([[o.card[0], 1], [o.card[1], 1]], 3, o.card[2]),
+      cardShadow: frameSvg([[o.card[0], 1], [o.card[1], 1]], 3, o.card[2], { offset: 2, colour: hardShadow }),
       btn: frameSvg([[o.btn[0], 1]], 2, o.btn[2]),
       btnHot: frameSvg([[o.btn[1], 1]], 2, o.btnHot ?? o.btn[2]),
       primary: frameSvg([[o.primary[0], 1], [o.primary[1], 1]], 2, o.primary[2]),
@@ -217,9 +219,7 @@ export const SITE_DARK = make({
 /** [t]'s CSS under the selector [s]. */
 function cssFor(t, s) {
   const tokens = Object.entries(t.tokens).map(([k, v]) => `${k}:${v}`).join(';');
-  const frames = Object.entries(t.frames).map(([name, { slice, url }]) =>
-    `${s} .f-${name}{border-width:calc(var(--px)*${slice});border-image:${url} ${slice} fill/calc(var(--px)*${slice}) stretch}` +
-    `${s} .h-${name}:hover,${s} .h-${name}:focus-visible{border-image-source:${url}}`).join('\n');
+  const frames = Object.entries(t.frames).map(([name, frame]) => frameRule(name, frame, s)).join('\n');
   return `${s}{${tokens}}\n${frames}\n${t.css(s)}`;
 }
 

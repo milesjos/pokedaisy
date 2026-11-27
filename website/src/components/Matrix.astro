@@ -73,7 +73,7 @@ const sheetText = {
     </label>
   </div>
 
-  <div class="table f-card">
+  <div class="table f-cardShadow">
     <div class="tr head">
       <span class="game-col small muted">{tr('GAME')}</span>
       {data.matrix.columns.map((c) => (
@@ -157,7 +157,8 @@ const sheetText = {
   .games-search:focus-visible { outline: var(--px) dashed var(--red); outline-offset: var(--px); }
   .games-none { padding: 14px calc(var(--px) * 5); }
   .games-none[hidden] { display: none; }
-  .table { filter: var(--hard-shadow); padding: calc(var(--px) * 2) 0; }
+  /* Its shadow is in its frame (f-cardShadow): a filter on this 17,000 px table made every repaint in it costly. */
+  .table { padding: calc(var(--px) * 2) 0; }
   .tr { display: grid; grid-template-columns: minmax(0, 1fr) repeat(6, 76px); align-items: center; padding: 10px calc(var(--px) * 5); }
   .tr.head { border-bottom: var(--px) solid var(--ink); padding-bottom: 12px; }
   .tr.row + .tr.row { border-top: var(--px) solid var(--line); }

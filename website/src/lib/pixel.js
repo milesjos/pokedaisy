@@ -927,32 +927,63 @@ export function spriteUrl(name) {
   return `url("data:image/svg+xml,${encodeURIComponent(spriteSvg(name).svg)}")`;
 }
 
-/** One sprite as an SVG string: each row's runs of one colour merged into a rect. */
+/**
+ * Pixel runs as rects: [runs] of [x, y, width, colour], a row's runs of one colour already merged. A run
+ * repeated (same x, width and colour) in the rows below becomes one taller rect. With crispEdges each rect's
+ * edges snap to device pixels on their own, so a taller rect lands on exactly the pixels its rows did (a
+ * <path> per colour did not: at the phone's odd scales Chrome drew its edges soft), with far fewer nodes for
+ * the browser to keep and raster.
+ */
+function pixelRects(runs) {
+  const open = new Map(); // `${x},${w},${c}` -> rect still growing down
+  const rects = [];
+  let row = -1;
+  for (const [x, y, w, c] of runs) {
+    if (y !== row) {
+      for (const [k, r] of open) if (r.y + r.h < y) { rects.push(r); open.delete(k); }
+      row = y;
+    }
+    const k = `${x},${w},${c}`;
+    const r = open.get(k);
+    if (r && r.y + r.h === y) r.h++;
+    else { if (r) rects.push(r); open.set(k, { x, y, w, h: 1, c }); }
+  }
+  rects.push(...open.values());
+  return rects.map((r) => `<rect x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" fill="${r.c}"/>`).join('');
+}
+
+/** One sprite as an SVG string: each row's runs of one colour, merged down into rects. */
 export function spriteSvg(name, attrs = '') {
   const s = SPRITES[name];
   if (!s) throw new Error(`no sprite ${name}`);
   const w = Math.max(...s.rows.map((r) => r.length));
   const h = s.rows.length;
-  let rects = '';
+  const runs = [];
   s.rows.forEach((row, y) => {
     let x = 0;
     while (x < row.length) {
       const c = row[x];
       let end = x + 1;
       while (end < row.length && row[end] === c) end++;
-      if (c !== '.' && s.pal[c]) rects += `<rect x="${x}" y="${y}" width="${end - x}" height="1" fill="${s.pal[c]}"/>`;
+      if (c !== '.' && s.pal[c]) runs.push([x, y, end - x, s.pal[c]]);
       x = end;
     }
   });
-  return { w, h, svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" shape-rendering="crispEdges" ${attrs}>${rects}</svg>` };
+  return { w, h, svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" shape-rendering="crispEdges" ${attrs}>${pixelRects(runs)}</svg>` };
 }
 
 /**
  * A pixel window frame as a 9-slice SVG: [layers] of [colour, width] from the outside in, the
  * corners rounded in whole pixels (radius [r]), then [fill]. Used with border-image, sliced at
  * the returned [slice] cells.
+ *
+ * [shadow] ({ offset, colour }) draws the site's hard shadow into the frame itself: the frame's shape again,
+ * [offset] pixels down and right, under it. That is what `filter: drop-shadow` paints round a card whose
+ * content stays inside it, without making the browser filter the whole element each time any of it is drawn
+ * (the compatibility table is 17,000 px tall). The image is then [offset] pixels larger on the right and
+ * bottom, which `frameRule` lays outside the border box.
  */
-export function frameSvg(layers, r, fill) {
+export function frameSvg(layers, r, fill, shadow) {
   const total = layers.reduce((n, [, w]) => n + w, 0);
   const slice = Math.max(total, r);
   const n = slice * 2 + 1;
@@ -964,32 +995,78 @@ export function frameSvg(layers, r, fill) {
     }
     return fill;
   };
-  let rects = '';
+  // Each cell's colour, null outside the rounded corners; then rows of one colour merged into runs.
+  const cells = [];
   for (let j = 0; j < n; j++) {
+    const row = [];
     for (let i = 0; i < n; i++) {
       const x = Math.min(i, n - 1 - i);
       const y = Math.min(j, n - 1 - j);
       let depth;
       if (x < r && y < r) {
         const d = r - Math.hypot(r - x - 0.5, r - y - 0.5);
-        if (d < 0) continue;
+        if (d < 0) { row.push(null); continue; }
         depth = Math.floor(d);
       } else {
         depth = Math.min(x, y);
       }
-      const c = colourAt(depth);
-      if (c !== 'none') rects += `<rect x="${i}" y="${j}" width="1" height="1" fill="${c}"/>`;
+      row.push(colourAt(depth));
     }
+    cells.push(row);
   }
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${n} ${n}" width="${n}" height="${n}" shape-rendering="crispEdges">${rects}</svg>`;
-  return { slice, url: `url("data:image/svg+xml,${encodeURIComponent(svg)}")` };
+  const runsOf = (keep, colourOf, dx = 0) => {
+    const runs = [];
+    cells.forEach((row, j) => {
+      let i = 0;
+      while (i < n) {
+        const c = keep(row[i]) ? colourOf(row[i]) : null;
+        let end = i + 1;
+        while (end < n && (keep(row[end]) ? colourOf(row[end]) : null) === c) end++;
+        if (c) runs.push([i + dx, j + dx, end - i, c]);
+        i = end;
+      }
+    });
+    return runs;
+  };
+  const off = shadow ? shadow.offset : 0;
+  const size = n + off;
+  // drop-shadow follows the element's alpha: every drawn cell, the see-through fill ('none') too if
+  // anything showed through it, so a shadowed frame must have a solid fill.
+  if (shadow && fill === 'none') throw new Error('a shadowed frame needs a solid fill');
+  const body = (shadow ? pixelRects(runsOf((c) => c && c !== 'none', () => shadow.colour, off)) : '') +
+    pixelRects(runsOf((c) => c && c !== 'none', (c) => c));
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${size} ${size}" width="${size}" height="${size}" shape-rendering="crispEdges">${body}</svg>`;
+  return { slice, shadow: off, url: `url("data:image/svg+xml,${encodeURIComponent(svg)}")` };
+}
+
+/**
+ * The CSS that draws frame [name] under [scope] (a theme's selector, or nothing): `.f-NAME` draws it, `.h-NAME`
+ * swaps to it on hover / focus. A frame with a baked shadow keeps its border at [slice] (the layout doesn't move)
+ * and lays the shadow's extra pixels outside the border box with border-image-outset.
+ */
+export function frameRule(name, { slice, shadow, url }, scope = '') {
+  const s = scope ? `${scope} ` : '';
+  const u = (k) => `calc(var(--px)*${k})`;
+  const draw = shadow
+    ? `border-image:${url} ${slice} ${slice + shadow} ${slice + shadow} ${slice} fill/` +
+      `${u(slice)} ${u(slice + shadow)} ${u(slice + shadow)} ${u(slice)}/0 ${u(shadow)} ${u(shadow)} 0 stretch`
+    : `border-image:${url} ${slice} fill/${u(slice)} stretch`;
+  // A theme's rules only redraw the frame: the site's own give it a solid, see-through border (a theme
+  // setting those too would beat an element's own border colour on its pages).
+  const base = scope ? '' : 'border-style:solid;border-color:transparent;';
+  return `${s}.f-${name}{${base}border-width:${u(slice)};${draw}}` +
+    `${s}.h-${name}:hover,${s}.h-${name}:focus-visible{border-image-source:${url}}`;
 }
 
 /** Every frame the site uses: modern ink-outlined cards and buttons, plus the game's own
  * OPTION list / title / dialog windows (the app's OptionColors, GbaMenu.kt) for the game UI. */
 const INKF = '#1d1b26';
+/** Base.astro's --hard-shadow colour; its offset is 2 pixels. */
+export const HARD_SHADOW = 'rgba(29, 27, 38, 0.14)';
 export const FRAMES = {
   card: frameSvg([[INKF, 1]], 3, '#ffffff'),
+  // The card with the site's hard shadow (--hard-shadow) drawn in: for big cards, in place of the filter.
+  cardShadow: frameSvg([[INKF, 1]], 3, '#ffffff', { offset: 2, colour: HARD_SHADOW }),
   btn: frameSvg([[INKF, 1]], 2, '#ffffff'),
   btnHot: frameSvg([[INKF, 1]], 2, '#fff6d0'),
   primary: frameSvg([[INKF, 1], ['#ff8a78', 1]], 2, '#e83028'),
@@ -1056,8 +1133,5 @@ export const FRAMES = {
 
 /** CSS for every frame: `.f-NAME` draws it (border-image), `.h-NAME` swaps to it on hover / focus. */
 export function frameCss() {
-  return Object.entries(FRAMES).map(([name, { slice, url }]) =>
-    `.f-${name}{border-style:solid;border-color:transparent;border-width:calc(var(--px)*${slice});` +
-    `border-image:${url} ${slice} fill/calc(var(--px)*${slice}) stretch}` +
-    `.h-${name}:hover,.h-${name}:focus-visible{border-image-source:${url}}`).join('\n');
+  return Object.entries(FRAMES).map(([name, frame]) => frameRule(name, frame)).join('\n');
 }
